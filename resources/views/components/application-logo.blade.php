@@ -1,0 +1,1 @@
+<img src="{{ asset('images/logo-rujukan.png') }}" alt="Logo Aplikasi" class="w-20 h-20 mx-auto">
