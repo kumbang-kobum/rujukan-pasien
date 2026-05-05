@@ -59,6 +59,16 @@
         <td>{{ $rujukan->created_at->format('d/m/Y H:i') }}</td>
       </tr>
       <tr>
+        <th>Asal Konsultasi</th>
+        <td>
+          @if($rujukan->originKonsultasi)
+            <a href="{{ route('konsultasi.show', $rujukan->originKonsultasi) }}">{{ $rujukan->originKonsultasi->no_konsultasi }}</a>
+          @else
+            -
+          @endif
+        </td>
+      </tr>
+      <tr>
         <th>Diperbarui</th>
         <td>{{ $rujukan->updated_at->format('d/m/Y H:i') }}</td>
       </tr>

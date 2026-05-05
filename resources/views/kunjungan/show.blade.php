@@ -26,6 +26,10 @@
                 <td>{{ $kunjungan->dokter->name ?? '-' }}</td>
             </tr>
             <tr>
+                <th>Encounter SATUSEHAT</th>
+                <td>{{ $kunjungan->satusehat_encounter_id ?? '-' }}</td>
+            </tr>
+            <tr>
                 <th>Rawat Jalan / Rawat Inap</th>
                 <td>{{ $kunjungan->rajalranap }}</td>
             </tr>
@@ -54,11 +58,6 @@
             <a href="{{ route('kunjungan.edit',$kunjungan->id) }}" class="btn btn-warning btn-sm">
                 <i class="fas fa-edit"></i> Edit
             </a>
-            @if(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdmin()))
-                <a href="{{ route('konsultasi.create', ['kunjungan_id' => $kunjungan->id]) }}" class="btn btn-info btn-sm">
-                    <i class="fas fa-comment-medical"></i> Konsultasi
-                </a>
-            @endif
             <form action="{{ route('kunjungan.destroy',$kunjungan->id) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('Hapus kunjungan ini?')">
                 @csrf @method('DELETE')
@@ -71,6 +70,11 @@
                         <i class="fas fa-sign-out-alt"></i> Pulangkan
                     </button>
                 </form>
+            @endif
+            @if(auth()->user()->isDokter() || auth()->user()->isAdmin())
+                <a href="{{ route('konsultasi.create', ['kunjungan_id' => $kunjungan->id]) }}" class="btn btn-primary btn-sm">
+                    <i class="fas fa-comments-medical"></i> Buat Konsultasi
+                </a>
             @endif
         </div>
 

@@ -18,6 +18,7 @@ class RumahSakitFactory extends Factory
     {
         return [
             'nama' => 'RS ' . fake()->unique()->city(),
+            'organization_ihs_number' => fake()->optional()->numerify('1000###'),
             'alamat' => fake()->address(),
             'telepon' => fake()->phoneNumber(),
         ];

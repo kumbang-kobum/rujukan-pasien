@@ -30,6 +30,11 @@
             </div>
 
             <div class="mb-3">
+                <label>Encounter SATUSEHAT</label>
+                <input type="text" name="satusehat_encounter_id" class="form-control" value="{{ old('satusehat_encounter_id', $kunjungan->satusehat_encounter_id) }}">
+            </div>
+
+            <div class="mb-3">
                 <label>Rawat Jalan / Rawat Inap</label>
                 <input type="text" name="rajalranap" class="form-control" value="{{ $kunjungan->rajalranap }}" required>
             </div>

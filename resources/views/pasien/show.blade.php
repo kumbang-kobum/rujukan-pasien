@@ -7,6 +7,7 @@
         <ul class="list-group">
             <li class="list-group-item"><strong>No RM:</strong> {{ $pasien->no_rkm_medis }}</li>
             <li class="list-group-item"><strong>NIK:</strong> {{ $pasien->nik }}</li>
+            <li class="list-group-item"><strong>Patient IHS:</strong> {{ $pasien->patient_ihs_number ?? '-' }}</li>
             <li class="list-group-item"><strong>Nama:</strong> {{ $pasien->nama }}</li>
             <li class="list-group-item"><strong>Jenis Kelamin:</strong> {{ $pasien->jenis_kelamin == 'L' ? 'Laki-laki' : 'Perempuan' }}</li>
             <li class="list-group-item"><strong>Alamat:</strong> {{ $pasien->alamat }}</li>

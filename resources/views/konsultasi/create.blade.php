@@ -1,25 +1,26 @@
 @extends('layouts.app')
-@section('title', 'Buat Konsultasi')
+@section('title','Tambah Konsultasi')
 
 @section('content')
-<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
-    <div>
-        <h4 class="mb-1">Buat Konsultasi Antar Dokter</h4>
-        <div class="text-muted">Kirim ringkasan klinis yang relevan ke dokter tujuan di rumah sakit lain.</div>
-    </div>
-    <a href="{{ route('konsultasi.index') }}" class="btn btn-outline-secondary">Kembali</a>
+<div class="card shadow-sm">
+  <div class="card-header bg-primary text-white">
+    <i class="fas fa-comments-medical me-2"></i> Tambah Konsultasi Antar Dokter
+  </div>
+  <div class="card-body">
+    <form method="POST" action="{{ route('konsultasi.store') }}">
+      @csrf
+      @include('konsultasi.form')
+
+      <div class="mt-4 d-flex gap-2 flex-wrap">
+        <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
+          <i class="fas fa-save me-1"></i> Simpan Draft
+        </button>
+        <button type="submit" name="action" value="submit" class="btn btn-primary">
+          <i class="fas fa-paper-plane me-1"></i> Simpan & Kirim
+        </button>
+        <a href="{{ route('konsultasi.index') }}" class="btn btn-secondary">Batal</a>
+      </div>
+    </form>
+  </div>
 </div>
-
-@if($errors->any())
-    <div class="alert alert-danger">
-        <div class="fw-semibold mb-1">Konsultasi belum bisa disimpan.</div>
-        <ul class="mb-0 ps-3">
-            @foreach($errors->all() as $error)
-                <li>{{ $error }}</li>
-            @endforeach
-        </ul>
-    </div>
-@endif
-
-@include('konsultasi._form')
 @endsection

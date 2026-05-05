@@ -14,8 +14,14 @@ class KonsultasiPesan extends Model
     protected $fillable = [
         'konsultasi_id',
         'pengirim_id',
-        'tipe',
-        'pesan',
+        'jenis_pesan',
+        'isi_pesan',
+        'status',
+        'dibaca_at',
+    ];
+
+    protected $casts = [
+        'dibaca_at' => 'datetime',
     ];
 
     public function konsultasi()
@@ -26,14 +32,5 @@ class KonsultasiPesan extends Model
     public function pengirim()
     {
         return $this->belongsTo(User::class, 'pengirim_id');
-    }
-
-    public static function typeLabels(): array
-    {
-        return [
-            'pesan' => 'Pesan / Diskusi',
-            'jawaban' => 'Jawaban Klinis',
-            'minta_info' => 'Minta Info Tambahan',
-        ];
     }
 }

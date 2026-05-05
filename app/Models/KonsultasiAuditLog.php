@@ -13,9 +13,12 @@ class KonsultasiAuditLog extends Model
 
     protected $fillable = [
         'konsultasi_id',
-        'user_id',
-        'aksi',
+        'actor_user_id',
+        'event_type',
+        'deskripsi',
         'payload',
+        'ip_address',
+        'user_agent',
     ];
 
     protected $casts = [
@@ -27,8 +30,8 @@ class KonsultasiAuditLog extends Model
         return $this->belongsTo(Konsultasi::class, 'konsultasi_id');
     }
 
-    public function user()
+    public function actor()
     {
-        return $this->belongsTo(User::class, 'user_id');
+        return $this->belongsTo(User::class, 'actor_user_id');
     }
 }

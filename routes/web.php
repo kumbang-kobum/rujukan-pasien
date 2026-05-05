@@ -5,13 +5,14 @@ use App\Http\Controllers\DashboardController;
 use App\Http\Controllers\PasienController;
 use App\Http\Controllers\RujukanController;
 use App\Http\Controllers\KunjunganController;
+use App\Http\Controllers\KonsultasiController;
+use App\Http\Controllers\NotificationController;
 use App\Http\Controllers\SOAPController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BerkasMedisController;
 use App\Http\Controllers\AjaxRujukanController;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\AdminController;
-use App\Http\Controllers\KonsultasiController;
 use App\Http\Controllers\RumahSakitController;
 use App\Http\Controllers\ProfileController;
 
@@ -60,11 +61,7 @@ Route::middleware(['auth'])->group(function () {
     Route::resource('pasien', PasienController::class);
     Route::resource('soap', SOAPController::class);
     Route::resource('rujukan', RujukanController::class);
-    Route::resource('konsultasi', KonsultasiController::class);
-    Route::patch('/konsultasi/{konsultasi}/accept', [KonsultasiController::class, 'accept'])->name('konsultasi.accept');
-    Route::post('/konsultasi/{konsultasi}/reply', [KonsultasiController::class, 'reply'])->name('konsultasi.reply');
-    Route::patch('/konsultasi/{konsultasi}/close', [KonsultasiController::class, 'close'])->name('konsultasi.close');
-    Route::post('/konsultasi/{konsultasi}/escalate', [KonsultasiController::class, 'escalate'])->name('konsultasi.escalate');
+    Route::resource('konsultasi', KonsultasiController::class)->except(['destroy']);
     Route::resource('berkas', BerkasMedisController::class);
 
     // Kunjungan routes
@@ -75,6 +72,13 @@ Route::middleware(['auth'])->group(function () {
         ->name('kunjungan.cetak');
     Route::resource('kunjungan', KunjunganController::class);
     Route::patch('/rujukan/{rujukan}/status/{status}', [RujukanController::class,'ubahStatus'])->name('rujukan.ubahStatus');
+    Route::patch('/konsultasi/{konsultasi}/submit', [KonsultasiController::class, 'submit'])->name('konsultasi.submit');
+    Route::patch('/konsultasi/{konsultasi}/status/{status}', [KonsultasiController::class, 'ubahStatus'])->name('konsultasi.ubahStatus');
+    Route::post('/konsultasi/{konsultasi}/pesan', [KonsultasiController::class, 'balas'])->name('konsultasi.balas');
+    Route::patch('/konsultasi/{konsultasi}/tutup', [KonsultasiController::class, 'tutup'])->name('konsultasi.tutup');
+    Route::post('/konsultasi/{konsultasi}/eskalasi', [KonsultasiController::class, 'eskalasi'])->name('konsultasi.eskalasi');
+    Route::post('/notifications/read-all', [NotificationController::class, 'readAll'])->name('notifications.read-all');
+    Route::post('/notifications/{notificationId}/read', [NotificationController::class, 'read'])->name('notifications.read');
 
     // Default redirect setelah login
     Route::get('/', function () { 

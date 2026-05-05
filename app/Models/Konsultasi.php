@@ -9,73 +9,86 @@ class Konsultasi extends Model
 {
     use HasFactory;
 
-    public const STATUS_DRAFT = 'draft';
-    public const STATUS_TERKIRIM = 'terkirim';
-    public const STATUS_DIBACA = 'dibaca';
-    public const STATUS_DITERIMA = 'diterima';
-    public const STATUS_DISKUSI = 'diskusi';
-    public const STATUS_BUTUH_INFO = 'butuh_info';
-    public const STATUS_DIJAWAB = 'dijawab';
-    public const STATUS_DITUTUP = 'ditutup';
-    public const STATUS_DIRUJUK = 'dijadikan_rujukan';
-
-    public const CONSENT_MENUNGGU = 'menunggu';
-    public const CONSENT_DIBERIKAN = 'diberikan';
-    public const CONSENT_DITOLAK = 'ditolak';
-
     protected $table = 'konsultasi';
 
+    public const STATUS_DRAFT = 'draft';
+    public const STATUS_AWAITING_CONSENT = 'awaiting_consent';
+    public const STATUS_SUBMITTED = 'submitted';
+    public const STATUS_READ = 'read';
+    public const STATUS_ACCEPTED = 'accepted';
+    public const STATUS_REJECTED = 'rejected';
+    public const STATUS_AWAITING_MORE_INFO = 'awaiting_more_info';
+    public const STATUS_IN_DISCUSSION = 'in_discussion';
+    public const STATUS_ANSWERED = 'answered';
+    public const STATUS_CLOSED = 'closed';
+    public const STATUS_ESCALATED = 'escalated_to_referral';
+    public const STATUS_CANCELLED = 'cancelled';
+
     protected $fillable = [
+        'no_konsultasi',
         'kunjungan_id',
+        'pasien_id',
         'rumah_sakit_asal_id',
         'rumah_sakit_tujuan_id',
         'dokter_pengirim_id',
         'dokter_tujuan_id',
-        'rujukan_id',
+        'escalated_to_rujukan_id',
+        'patient_ihs_number',
+        'organization_ihs_asal',
+        'organization_ihs_tujuan',
+        'practitioner_ihs_pengirim',
+        'practitioner_ihs_tujuan',
+        'practitioner_role_pengirim',
+        'practitioner_role_tujuan',
+        'encounter_satusehat_id',
         'judul',
+        'urgensi',
+        'alasan_konsultasi',
+        'pertanyaan_klinis',
         'ringkasan_klinis',
         'diagnosis_kerja',
-        'terapi_berjalan',
         'hasil_penunjang',
-        'alasan_konsultasi',
-        'pertanyaan_konsultasi',
-        'status',
+        'terapi_berjalan',
         'consent_status',
-        'consent_nama_pemberi',
-        'consent_hubungan',
-        'consent_metode',
-        'consent_diberikan_pada',
-        'consent_catatan',
+        'consent_granted_by_name',
+        'consent_granted_by_role',
+        'consent_method',
+        'consent_granted_at',
+        'consent_expires_at',
+        'consent_notes',
+        'status',
         'submitted_at',
-        'read_at',
         'accepted_at',
+        'answered_at',
         'closed_at',
-        'closed_by',
+        'last_message_at',
+        'cancelled_reason',
     ];
 
     protected $casts = [
+        'consent_granted_at' => 'datetime',
+        'consent_expires_at' => 'datetime',
         'submitted_at' => 'datetime',
-        'read_at' => 'datetime',
         'accepted_at' => 'datetime',
+        'answered_at' => 'datetime',
         'closed_at' => 'datetime',
-        'consent_diberikan_pada' => 'datetime',
+        'last_message_at' => 'datetime',
     ];
 
     public function scopeVisibleTo($query, User $user)
     {
         if ($user->isAdmin()) {
-            return $query->where(function ($inner) use ($user) {
-                $inner->where('rumah_sakit_asal_id', $user->rumah_sakit_id)
-                    ->orWhere('rumah_sakit_tujuan_id', $user->rumah_sakit_id);
-            });
+            return $query;
         }
 
-        return $query->where(function ($inner) use ($user) {
-            $inner->where('dokter_pengirim_id', $user->id)
-                ->orWhere(function ($received) use ($user) {
-                    $received->where('dokter_tujuan_id', $user->id)
-                        ->where('status', '!=', self::STATUS_DRAFT)
-                        ->where('consent_status', self::CONSENT_DIBERIKAN);
+        return $query->where(function ($q) use ($user) {
+            $q->where('dokter_pengirim_id', $user->id)
+                ->orWhere('rumah_sakit_asal_id', $user->rumah_sakit_id)
+                ->orWhere(function ($target) use ($user) {
+                    $target->where(function ($targetIdentity) use ($user) {
+                        $targetIdentity->where('dokter_tujuan_id', $user->id)
+                            ->orWhere('rumah_sakit_tujuan_id', $user->rumah_sakit_id);
+                    })->whereIn('status', self::targetVisibleStatuses());
                 });
         });
     }
@@ -83,6 +96,11 @@ class Konsultasi extends Model
     public function kunjungan()
     {
         return $this->belongsTo(Kunjungan::class, 'kunjungan_id');
+    }
+
+    public function pasien()
+    {
+        return $this->belongsTo(Pasien::class, 'pasien_id');
     }
 
     public function rsAsal()
@@ -107,17 +125,12 @@ class Konsultasi extends Model
 
     public function rujukan()
     {
-        return $this->belongsTo(Rujukan::class, 'rujukan_id');
-    }
-
-    public function closedBy()
-    {
-        return $this->belongsTo(User::class, 'closed_by');
+        return $this->belongsTo(Rujukan::class, 'escalated_to_rujukan_id');
     }
 
     public function pesan()
     {
-        return $this->hasMany(KonsultasiPesan::class, 'konsultasi_id')->orderBy('created_at');
+        return $this->hasMany(KonsultasiPesan::class, 'konsultasi_id')->latest();
     }
 
     public function auditLogs()
@@ -125,63 +138,130 @@ class Konsultasi extends Model
         return $this->hasMany(KonsultasiAuditLog::class, 'konsultasi_id')->latest();
     }
 
-    public function latestMessage()
+    public function isTerminal(): bool
     {
-        return $this->hasOne(KonsultasiPesan::class, 'konsultasi_id')->latestOfMany();
+        return in_array($this->status, [
+            self::STATUS_CLOSED,
+            self::STATUS_ESCALATED,
+            self::STATUS_CANCELLED,
+        ], true);
     }
 
-    public function markAsRead(): void
+    public static function sourceEditableStatuses(): array
     {
-        if ($this->status === self::STATUS_TERKIRIM) {
-            $this->forceFill([
-                'status' => self::STATUS_DIBACA,
-                'read_at' => $this->read_at ?? now(),
-            ])->save();
+        return [
+            self::STATUS_DRAFT,
+            self::STATUS_AWAITING_CONSENT,
+            self::STATUS_SUBMITTED,
+            self::STATUS_READ,
+            self::STATUS_AWAITING_MORE_INFO,
+            self::STATUS_REJECTED,
+        ];
+    }
+
+    public static function replyableStatuses(): array
+    {
+        return [
+            self::STATUS_READ,
+            self::STATUS_ACCEPTED,
+            self::STATUS_AWAITING_MORE_INFO,
+            self::STATUS_IN_DISCUSSION,
+            self::STATUS_ANSWERED,
+        ];
+    }
+
+    public static function targetVisibleStatuses(): array
+    {
+        return [
+            self::STATUS_SUBMITTED,
+            self::STATUS_READ,
+            self::STATUS_ACCEPTED,
+            self::STATUS_REJECTED,
+            self::STATUS_AWAITING_MORE_INFO,
+            self::STATUS_IN_DISCUSSION,
+            self::STATUS_ANSWERED,
+            self::STATUS_CLOSED,
+            self::STATUS_ESCALATED,
+            self::STATUS_CANCELLED,
+        ];
+    }
+
+    public function isReplyable(): bool
+    {
+        return in_array($this->status, self::replyableStatuses(), true);
+    }
+
+    public function isVisibleTo(User $user): bool
+    {
+        if ($user->isAdmin()) {
+            return true;
         }
+
+        if (!$user->isDokter()) {
+            return false;
+        }
+
+        $isSourceSide = (int) $user->id === (int) $this->dokter_pengirim_id
+            || (int) $user->rumah_sakit_id === (int) $this->rumah_sakit_asal_id;
+
+        if ($isSourceSide) {
+            return true;
+        }
+
+        $isTargetSide = (int) $user->id === (int) $this->dokter_tujuan_id
+            || (int) $user->rumah_sakit_id === (int) $this->rumah_sakit_tujuan_id;
+
+        if (!$isTargetSide) {
+            return false;
+        }
+
+        return in_array($this->status, self::targetVisibleStatuses(), true);
     }
 
-    public function canReply(): bool
+    public function statusLabel(): string
     {
-        return !in_array($this->status, [self::STATUS_DRAFT, self::STATUS_DITUTUP, self::STATUS_DIRUJUK], true);
-    }
-
-    public function isSender(User $user): bool
-    {
-        return (int) $this->dokter_pengirim_id === (int) $user->id;
-    }
-
-    public function isTarget(User $user): bool
-    {
-        return (int) $this->dokter_tujuan_id === (int) $user->id;
-    }
-
-    public static function statusLabels(): array
-    {
-        return [
+        return match ($this->status) {
             self::STATUS_DRAFT => 'Draft',
-            self::STATUS_TERKIRIM => 'Terkirim',
-            self::STATUS_DIBACA => 'Dibaca',
-            self::STATUS_DITERIMA => 'Diterima',
-            self::STATUS_DISKUSI => 'Diskusi',
-            self::STATUS_BUTUH_INFO => 'Butuh Info',
-            self::STATUS_DIJAWAB => 'Dijawab',
-            self::STATUS_DITUTUP => 'Ditutup',
-            self::STATUS_DIRUJUK => 'Jadi Rujukan',
-        ];
+            self::STATUS_AWAITING_CONSENT => 'Menunggu Consent',
+            self::STATUS_SUBMITTED => 'Terkirim',
+            self::STATUS_READ => 'Dibaca',
+            self::STATUS_ACCEPTED => 'Diterima',
+            self::STATUS_REJECTED => 'Ditolak',
+            self::STATUS_AWAITING_MORE_INFO => 'Butuh Info Tambahan',
+            self::STATUS_IN_DISCUSSION => 'Dalam Diskusi',
+            self::STATUS_ANSWERED => 'Sudah Dijawab',
+            self::STATUS_CLOSED => 'Ditutup',
+            self::STATUS_ESCALATED => 'Dilanjutkan ke Rujukan',
+            self::STATUS_CANCELLED => 'Dibatalkan',
+            default => ucfirst(str_replace('_', ' ', $this->status)),
+        };
     }
 
-    public static function statusBadgeClasses(): array
+    public function statusBadgeClass(): string
     {
-        return [
-            self::STATUS_DRAFT => 'bg-secondary',
-            self::STATUS_TERKIRIM => 'bg-primary',
-            self::STATUS_DIBACA => 'bg-info text-dark',
-            self::STATUS_DITERIMA => 'bg-success',
-            self::STATUS_DISKUSI => 'bg-dark',
-            self::STATUS_BUTUH_INFO => 'bg-warning text-dark',
-            self::STATUS_DIJAWAB => 'bg-success',
-            self::STATUS_DITUTUP => 'bg-secondary',
-            self::STATUS_DIRUJUK => 'bg-success',
-        ];
+        return match ($this->status) {
+            self::STATUS_DRAFT => 'secondary',
+            self::STATUS_AWAITING_CONSENT => 'warning text-dark',
+            self::STATUS_SUBMITTED => 'primary',
+            self::STATUS_READ => 'info text-dark',
+            self::STATUS_ACCEPTED => 'success',
+            self::STATUS_REJECTED => 'danger',
+            self::STATUS_AWAITING_MORE_INFO => 'warning text-dark',
+            self::STATUS_IN_DISCUSSION => 'info text-dark',
+            self::STATUS_ANSWERED => 'success',
+            self::STATUS_CLOSED => 'dark',
+            self::STATUS_ESCALATED => 'success',
+            self::STATUS_CANCELLED => 'secondary',
+            default => 'secondary',
+        };
+    }
+
+    public function urgencyLabel(): string
+    {
+        return match ($this->urgensi) {
+            'gawat' => 'Gawat',
+            'segera' => 'Segera',
+            default => 'Rutin',
+        };
     }
 }

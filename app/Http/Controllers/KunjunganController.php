@@ -87,6 +87,7 @@ class KunjunganController extends Controller
         $request->validate([
             'pasien_id' => 'required|exists:pasien,id',
             'dokter_id' => 'required|exists:users,id',
+            'satusehat_encounter_id' => 'nullable|string|max:100|unique:kunjungan,satusehat_encounter_id',
             'rajalranap'      => 'required|string|max:255',
             'tanggal_kunjungan' => 'required|date',
             'waktu_masuk' => 'required|date_format:H:i',
@@ -105,6 +106,7 @@ class KunjunganController extends Controller
             'dokter_id'        => $request->dokter_id,
             'user_id'          => Auth::id(),
             'rumah_sakit_id'   => Auth::user()->rumah_sakit_id,
+            'satusehat_encounter_id' => $request->satusehat_encounter_id,
             'rajalranap'             => $request->rajalranap,
             'tanggal_kunjungan'=> $request->tanggal_kunjungan,
             'waktu_masuk'      => $datetime,
@@ -139,6 +141,7 @@ class KunjunganController extends Controller
         $request->validate([
             'pasien_id' => 'required|exists:pasien,id',
             'dokter_id' => 'required|exists:users,id',
+            'satusehat_encounter_id' => 'nullable|string|max:100|unique:kunjungan,satusehat_encounter_id,'.$kunjungan->id,
             'rajalranap'      => 'required|string|max:255',
             'tanggal_kunjungan' => 'required|date',
             'waktu_masuk' => 'required|date_format:H:i',
@@ -151,6 +154,7 @@ class KunjunganController extends Controller
         $kunjungan->update([
             'pasien_id'        => $request->pasien_id,
             'dokter_id'        => $request->dokter_id,
+            'satusehat_encounter_id' => $request->satusehat_encounter_id,
             'rajalranap'             => $request->rajalranap,
             'tanggal_kunjungan'=> $request->tanggal_kunjungan,
             'waktu_masuk'      => $datetime,
