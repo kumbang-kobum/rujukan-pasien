@@ -87,6 +87,10 @@
         <h4>Plan</h4>
         <p class="multiline">{{ $soap->plan ?? '-' }}</p>
     </div>
-
+    <div class="section">
+        <h4>Advice</h4>
+        <p class="multiline">{{ $soap->advice ?? '-' }}</p>
+    </div>
+    
 </body>
 </html>

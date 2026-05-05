@@ -69,6 +69,7 @@
         <label class="form-label">Role</label>
         <select name="role" class="form-select" required>
           <option value="" disabled selected>Pilih...</option>
+          <option value="admin">Admin</option>
           <option value="dokter">Dokter</option>
           <option value="perawat">Perawat</option>
         </select>

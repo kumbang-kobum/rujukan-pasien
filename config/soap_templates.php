@@ -10,6 +10,13 @@ return [
         'Bengkak wajah-tangan-tungkai',
         'Kejang', // punya input frekuensi (…x)
     ],
+    
+    'vitals' => [
+        'token'    => '[[VITALS]]', // penanda untuk disubstitusi
+        'line'     => 'TD: [[TD_SYS]]/[[TD_DIA]] mmHg, MAP: [[MAP]] mmHg , N: …/menit, RR: …/menit, Suhu: …°C',
+        // opsional kalau mau ikut tampilkan yang lain:
+        // 'extra' => 'N: [[N]] x/menit, RR: [[RR]] x/menit, Suhu: [[SUHU]] °C',
+    ],
 
     // === TEMPLATE ===
     'preeklampsia_berat' => [
@@ -29,7 +36,6 @@ TXT,
         'objektif' => <<<TXT
 Pemeriksaan fisik :
 - Kesadaran: compos mentis / …
-- TD: …/… mmHg, N: …/menit, RR: …/menit, Suhu: …°C
 - Refleks patella: (+)/(-), edema: …, diuresis: … ml/jam
 Penunjang :
 - Protein urin: …
@@ -57,4 +63,16 @@ Rencana :
 - Edukasi keluarga
 TXT,
     ],
+    
+'assessment_presets' => [
+    'Preeklampsia berat',
+    'Eklampsia',
+    'HELLP',
+    'Edema paru',
+    'Acute Kidney Injury (AKI)',
+  ],
+  
+  // template snippet USG Objektif opsional:
+  'usg_template' => "USG Obstetri:\n- Biometri: ...\n- AFI/ICA: ...\n- Posisi plasenta: ...\n- Doppler: S/D AU: ... | PI AU: ... | CPR: ...\n",
+  
 ];

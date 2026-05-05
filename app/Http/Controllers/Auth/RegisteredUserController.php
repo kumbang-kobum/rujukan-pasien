@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Auth;
 
 use App\Http\Controllers\Controller;
+use App\Models\RumahSakit;
 use App\Models\User;
 use Illuminate\Auth\Events\Registered;
 use Illuminate\Http\RedirectResponse;
@@ -39,6 +40,13 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
+            'role' => 'dokter',
+            'rumah_sakit_id' => RumahSakit::query()->value('id')
+                ?? RumahSakit::create([
+                    'nama' => 'RS Default',
+                    'alamat' => 'Alamat belum diisi',
+                    'telepon' => '-',
+                ])->id,
         ]);
 
         event(new Registered($user));

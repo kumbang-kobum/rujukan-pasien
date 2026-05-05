@@ -43,7 +43,7 @@ class RujukanMasukNotification extends Notification implements ShouldQueue
         return (new MailMessage)
             ->replyTo($this->pengirim->email, $this->pengirim->name)
             ->subject("Rujukan Pasien: {$noRawat} ({$nmPasien})")
-            ->greeting('Yth. dr. '.$notifiable->name)
+            ->greeting('Yth. '.$notifiable->name)
             ->line("Ada rujukan pasien dari {$namaAsal} ke {$namaTujuan}.")
             ->line("Pasien: {$nmPasien} | No. RM: {$noRM}")
             ->line('Alasan: '.($r->alasan ?: '-'))

@@ -17,7 +17,9 @@ class RumahSakitFactory extends Factory
     public function definition(): array
     {
         return [
-            //
+            'nama' => 'RS ' . fake()->unique()->city(),
+            'alamat' => fake()->address(),
+            'telepon' => fake()->phoneNumber(),
         ];
     }
 }

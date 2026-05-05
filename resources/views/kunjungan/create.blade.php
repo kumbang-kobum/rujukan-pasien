@@ -27,8 +27,8 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Poli</label>
-        <input type="text" name="poli" class="form-control" required>
+        <label class="form-label">Rawat Jalan / Rawat Inap</label>
+        <input type="text" name="rajalranap" class="form-control" required>
       </div>
 
       <div class="row g-3">

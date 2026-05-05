@@ -69,6 +69,7 @@
       <div class="mb-3">
         <label class="form-label">Role</label>
         <select name="role" class="form-select" required>
+          <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>Admin</option>
           <option value="dokter" {{ $user->role == 'dokter' ? 'selected' : '' }}>Dokter</option>
           <option value="perawat" {{ $user->role == 'perawat' ? 'selected' : '' }}>Perawat</option>
         </select>

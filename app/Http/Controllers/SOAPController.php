@@ -4,9 +4,12 @@ namespace App\Http\Controllers;
 
 use App\Models\SOAP;
 use App\Models\Kunjungan;
+use App\Models\BerkasMedis;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use PDF;
 
 class SOAPController extends Controller
@@ -86,29 +89,76 @@ class SOAPController extends Controller
     public function store(Request $request)
     {
         $request->validate([
-            'kunjungan_id' => 'required|exists:kunjungan,id',
-            'subjektif'    => 'nullable|string',
-            'objektif'     => 'nullable|string',
-            'assessment'   => 'nullable|string',
-            'plan'         => 'nullable|string',
+            'kunjungan_id'              => 'required|exists:kunjungan,id',
+            'subjektif'                 => 'nullable|string',
+            'objektif'                  => 'nullable|string',
+            'assessment'                => 'nullable|string',
+            'plan'                      => 'nullable|string',
+            'advice'                    => 'nullable|string',
+            'td_sys'                    => 'nullable|integer|min:40|max:300',
+            'td_dia'                    => 'nullable|integer|min:20|max:200',
+            'map'                       => 'nullable|integer|min:20|max:200',
+    
+            // --- per baris ---
+            'lampiran_file'             => 'array',
+            'lampiran_file.*'           => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,pdf|max:5120',
+            'lampiran_kategori'         => 'array',
+            'lampiran_kategori.*'       => 'nullable|in:USG,LAB,LAIN',
         ]);
-
-        SOAP::create([
+    
+        // Hitung MAP jika diisi
+        $calcMap = null;
+        if ($request->filled(['td_sys','td_dia'])) {
+            $calcMap = (int) round($request->td_dia + ($request->td_sys - $request->td_dia) / 3);
+        }
+    
+        // Buat SOAP & simpan ke variabel
+        $soap = SOAP::create([
             'kunjungan_id' => $request->kunjungan_id,
             'user_id'      => Auth::id(),
             'subjektif'    => $request->subjektif,
             'objektif'     => $request->objektif,
             'assessment'   => $request->assessment,
             'plan'         => $request->plan,
+            'advice'       => $request->advice,
+            'td_sys'       => $request->td_sys,
+            'td_dia'       => $request->td_dia,
+            'map'          => $request->map ?? $calcMap,
         ]);
-
-        return redirect()->route('soap.index')->with('success','SOAP berhasil ditambahkan.');
+    
+        // ==== SIMPAN LAMPIRAN PER BARIS ====
+        $files = $request->file('lampiran_file', []);
+        $kats  = $request->input('lampiran_kategori', []);
+    
+        // Pastikan array keduanya sejajar
+        foreach ($files as $i => $file) {
+            if (!$file) continue;
+            if (method_exists($file, 'isValid') && !$file->isValid()) continue;
+    
+            $path = $file->store('berkas', 'public');
+    
+            $soap->berkas()->create([
+                'kunjungan_id' => $soap->kunjungan_id,                 // penting agar tidak error default value
+                'kategori'     => $kats[$i] ?? 'LAIN',                 // per indeks
+                'nama_file'    => $file->getClientOriginalName(),
+                'path'         => $path,
+                'uploader_id'  => Auth::id(), 
+                // Hapus baris ini jika kolom 'mime' tidak ada di tabel
+                // 'mime'         => $file->getClientMimeType(),
+                // 'user_id'      => auth()->id(),
+            ]);
+        }
+    
+        return redirect()->route('soap.index')->with('success', 'SOAP berhasil ditambahkan.');
     }
 
     public function show(SOAP $soap)
     {
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
-        return view('soap.show', compact('soap'));
+    
+        $berkasKunjungan = $soap->berkas()->with('uploader')->latest()->get();
+    
+        return view('soap.show', compact('soap','berkasKunjungan'));
     }
 
     public function edit(SOAP $soap)
@@ -117,9 +167,15 @@ class SOAPController extends Controller
             ->whereDate('tanggal_kunjungan', now()->toDateString())
             ->where('status_pulang', 0)
             ->get();
-
-        return view('soap.edit', compact('soap','kunjungan'));
+    
+        // HANYA berkas untuk kunjungan ini
+        $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
+    
+        $berkasKunjungan = $soap->berkas()->with('uploader')->latest()->get();
+    
+        return view('soap.edit', compact('soap', 'kunjungan', 'berkasKunjungan'));
     }
+
 
     public function update(Request $request, SOAP $soap)
     {
@@ -129,16 +185,100 @@ class SOAPController extends Controller
             'objektif'     => 'nullable|string',
             'assessment'   => 'nullable|string',
             'plan'         => 'nullable|string',
+            'advice'       => 'nullable|string',
+            'td_sys'       => 'nullable|integer|min:40|max:300',
+            'td_dia'       => 'nullable|integer|min:20|max:200',
+            'map'          => 'nullable|integer|min:20|max:200',
+    
+            // edit lampiran lama
+            'berkas_lama'               => 'array',
+            'berkas_lama.*.kategori'    => 'nullable|in:USG,LAB,LAIN',
+            'berkas_lama.*._delete'     => 'nullable|boolean',
+            'berkas_lama.*.file'        => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,pdf|max:5120',
+    
+            // tambah lampiran baru (opsional)
+            'lampiran_file'             => 'array',
+            'lampiran_file.*'           => 'nullable|file|mimes:jpg,jpeg,png,gif,webp,pdf|max:5120',
+            'lampiran_kategori'         => 'array',
+            'lampiran_kategori.*'       => 'nullable|in:USG,LAB,LAIN',
         ]);
-
+    
+        // hitung MAP jika perlu
+        $calcMap = null;
+        if ($request->filled(['td_sys','td_dia'])) {
+            $calcMap = (int) round($request->td_dia + ($request->td_sys - $request->td_dia) / 3);
+        }
+    
+        // update data SOAP
         $soap->update([
             'kunjungan_id' => $request->kunjungan_id,
             'subjektif'    => $request->subjektif,
             'objektif'     => $request->objektif,
             'assessment'   => $request->assessment,
             'plan'         => $request->plan,
+            'advice'       => $request->advice,
+            'td_sys'       => $request->td_sys,
+            'td_dia'       => $request->td_dia,
+            'map'          => $request->map ?? $calcMap,
         ]);
-
+    
+        /* ====== PROSES LAMPIRAN LAMA ====== */
+        foreach ((array)$request->input('berkas_lama', []) as $id => $row) {
+            $bk = $soap->berkas()->find($id);
+            if (!$bk) continue;
+    
+            // hapus
+            if (!empty($row['_delete'])) {
+                Storage::disk('public')->delete($bk->path);
+                $bk->delete();
+                continue;
+            }
+    
+            // update kategori
+            if (!empty($row['kategori']) && in_array($row['kategori'], ['USG','LAB','LAIN'])) {
+                $bk->kategori = $row['kategori'];
+            }
+    
+            // replace file
+            if ($request->hasFile("berkas_lama.$id.file")) {
+                $file    = $request->file("berkas_lama.$id.file");
+                $newPath = $file->store('berkas', 'public');
+    
+                // hapus file lama
+                Storage::disk('public')->delete($bk->path);
+    
+                $bk->path      = $newPath;
+                $bk->nama_file = $file->getClientOriginalName();
+                $bk->uploader_id = Auth::id();
+                // Jika tabel punya kolom 'mime' / 'user_id', aktifkan 2 baris ini:
+                // $bk->mime      = $file->getClientMimeType();
+                // $bk->user_id   = auth()->id();
+            }
+    
+            // jaga sinkron kunjungan
+            $bk->kunjungan_id = $soap->kunjungan_id;
+            $bk->save();
+        }
+    
+        /* ====== TAMBAH LAMPIRAN BARU (opsional) ====== */
+        $files = $request->file('lampiran_file', []);
+        $kats  = $request->input('lampiran_kategori', []);
+        foreach ((array)$files as $i => $file) {
+            if (!$file) continue;
+    
+            $path = $file->store('berkas', 'public');
+            $soap->berkas()->create([
+                'kunjungan_id' => $soap->kunjungan_id,
+                'kategori'     => $kats[$i] ?? 'LAIN',
+                'nama_file'    => $file->getClientOriginalName(),
+                'path'         => $path,
+                'uploader_id'  => Auth::id(), 
+                // aktifkan jika kolom tersedia:
+                // 'mime'      => $file->getClientMimeType(),
+                // 'user_id'   => auth()->id(),
+            ]);
+        }
+    
         return redirect()->route('soap.index')->with('success','SOAP berhasil diperbarui.');
     }
 

@@ -19,6 +19,7 @@ class User extends Authenticatable
         'name',
         'email',
         'password',
+        'avatar_path',
         'role',
         'rumah_sakit_id',
     ];
@@ -32,6 +33,13 @@ class User extends Authenticatable
     public function rumahSakit()
     {
         return $this->belongsTo(\App\Models\RumahSakit::class);
+    }
+    
+    public function getAvatarUrlAttribute(): string
+    {
+        return $this->avatar_path
+            ? asset('storage/'.$this->avatar_path)
+            : 'https://ui-avatars.com/api/?name='.urlencode($this->name).'&background=2563eb&color=fff&size=64';
     }
 
     // Helpers role
@@ -48,5 +56,19 @@ class User extends Authenticatable
     public function isPerawat()
     {
         return $this->role === 'perawat';
+    }
+    
+    public function rujukanCc() {
+        return $this->belongsToMany(Rujukan::class, 'rujukan_dokter_cc', 'dokter_id', 'rujukan_id');
+    }
+
+    public function konsultasiDikirim()
+    {
+        return $this->hasMany(Konsultasi::class, 'dokter_pengirim_id');
+    }
+
+    public function konsultasiDiterima()
+    {
+        return $this->hasMany(Konsultasi::class, 'dokter_tujuan_id');
     }
 }

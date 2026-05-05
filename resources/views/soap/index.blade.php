@@ -115,6 +115,7 @@
                         <th>Objektif</th>
                         <th>Assessment</th>
                         <th>Plan</th>
+                        <th>Advice</th>
                         <th>User Input</th>
                         <th class="text-center">Aksi</th>
                     </tr>
@@ -133,6 +134,7 @@
                         <td title="{{ $s->objektif ?? '' }}">{{ \Illuminate\Support\Str::limit($s->objektif, 80) }}</td>
                         <td title="{{ $s->assessment ?? '' }}">{{ \Illuminate\Support\Str::limit($s->assessment, 80) }}</td>
                         <td title="{{ $s->plan ?? '' }}">{{ \Illuminate\Support\Str::limit($s->plan, 80) }}</td>
+                        <td title="{{ $s->advice ?? '' }}">{{ \Illuminate\Support\Str::limit($s->advice, 80) }}</td>
 
                         <td class="text-nowrap">{{ $s->user->name ?? '-' }}</td>
 

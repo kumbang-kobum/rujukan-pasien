@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\User;
 
 class Rujukan extends Model
 {
@@ -28,6 +29,19 @@ class Rujukan extends Model
     'rumah_sakit_tujuan_id' => 'integer',
     ];
 
+    public function scopeVisibleTo($q, User $user)
+    {
+        // // Admin boleh melihat semua
+        // if ($user->role === 'admin') return $q;
+
+        $rsId = (int) $user->rumah_sakit_id;
+
+        return $q->where(function ($qq) use ($rsId) {
+            $qq->where('rumah_sakit_asal_id', $rsId)
+               ->orWhere('rumah_sakit_tujuan_id', $rsId);
+        });
+    }
+    
     public function kunjungan()
     {
         return $this->belongsTo(Kunjungan::class, 'kunjungan_id');
@@ -51,5 +65,11 @@ class Rujukan extends Model
     public function penerima()
     {
         return $this->belongsTo(User::class, 'penerima_id');
+    }
+    
+    public function dokterCc()
+    {
+        return $this->belongsToMany(User::class, 'rujukan_dokter_cc', 'rujukan_id', 'dokter_id')
+                    ->withTimestamps();
     }
 }

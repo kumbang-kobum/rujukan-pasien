@@ -21,7 +21,7 @@
                 <th>No. Rawat</th>
                 <th>Pasien</th>
                 <th>Dokter</th>
-                <th>Poli</th>
+                <th>Rawat Jalan / Rawat Inap</th>
                 <th>Tanggal</th>
                 <th>Status</th>
                 <th>Keluhan</th>
@@ -34,7 +34,7 @@
                 <td>{{ $k->no_rawat }}</td>
                 <td>{{ $k->pasien->no_rkm_medis ?? '' }} - {{ $k->pasien->nama ?? '' }}</td>
                 <td>{{ $k->dokter->name ?? '-' }}</td>
-                <td>{{ $k->poli }}</td>
+                <td>{{ $k->rajalranap }}</td>
                 <td>{{ $k->tanggal_kunjungan }} {{ \Carbon\Carbon::parse($k->waktu_masuk)->format('H:i') }}</td>
                 <td>{{ $k->status_pulang ? 'Pulang' : 'Rawat' }}</td>
                 <td>{{ $k->keluhan_utama ?? '-' }}</td>

@@ -26,8 +26,8 @@
                 <td>{{ $kunjungan->dokter->name ?? '-' }}</td>
             </tr>
             <tr>
-                <th>Poli</th>
-                <td>{{ $kunjungan->poli }}</td>
+                <th>Rawat Jalan / Rawat Inap</th>
+                <td>{{ $kunjungan->rajalranap }}</td>
             </tr>
             <tr>
                 <th>Tanggal & Jam Masuk</th>
@@ -47,10 +47,6 @@
                 <th>Keluhan Utama</th>
                 <td>{{ $kunjungan->keluhan_utama ?? '-' }}</td>
             </tr>
-            <tr>
-        <th>Penerima</th>
-        <td>{{ $rujukan->penerima->name ?? '-' }}</td>
-        </tr>
         </table>
 
         {{-- Tombol Aksi --}}
@@ -58,6 +54,11 @@
             <a href="{{ route('kunjungan.edit',$kunjungan->id) }}" class="btn btn-warning btn-sm">
                 <i class="fas fa-edit"></i> Edit
             </a>
+            @if(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdmin()))
+                <a href="{{ route('konsultasi.create', ['kunjungan_id' => $kunjungan->id]) }}" class="btn btn-info btn-sm">
+                    <i class="fas fa-comment-medical"></i> Konsultasi
+                </a>
+            @endif
             <form action="{{ route('kunjungan.destroy',$kunjungan->id) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('Hapus kunjungan ini?')">
                 @csrf @method('DELETE')

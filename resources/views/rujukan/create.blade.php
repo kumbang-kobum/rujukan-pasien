@@ -33,7 +33,8 @@
       <div class="mb-3">
         <label class="form-label">Rumah Sakit Tujuan</label>
         <select name="rumah_sakit_tujuan_id" id="rs_tujuan_id" class="form-select" required
-                data-url="{{ route('ajax.dokter-by-rs', ['rs'=>'__ID__']) }}">
+                data-url="{{ url('/ajax/dokter-by-rs/__ID__') }}"
+                onchange="window.__reloadDokter && window.__reloadDokter()">
           <option value="">-- Pilih RS --</option>
           @foreach($rumahSakit as $rs)
             <option value="{{ $rs->id }}" {{ old('rumah_sakit_tujuan_id')==$rs->id?'selected':'' }}>
@@ -43,15 +44,25 @@
         </select>
         @error('rumah_sakit_tujuan_id')<div class="text-danger small">{{ $message }}</div>@enderror
       </div>
-
-      {{-- Dokter Tujuan --}}
-      <div class="mb-3">
-        <label class="form-label">Dokter Tujuan</label>
-        <select name="dokter_tujuan_id" id="dokter_tujuan_id" class="form-select" required disabled>
-          <option value="">-- Pilih Dokter --</option>
-        </select>
-        @error('dokter_tujuan_id')<div class="text-danger small">{{ $message }}</div>@enderror
-      </div>
+      
+      {{-- Dokter Tujuan (utama) --}}
+        <div class="mb-3">
+          <label class="form-label">Dokter Tujuan (utama)</label>
+          <select name="dokter_tujuan_id" id="dokter_tujuan_id" class="form-select" required>
+            <option value="">-- Pilih Dokter --</option>
+          </select>
+          @error('dokter_tujuan_id')<div class="text-danger small">{{ $message }}</div>@enderror
+        </div>
+        
+        {{-- Dokter Tujuan Tambahan (tembusan, opsional) --}}
+        <div class="mb-3">
+          <label class="form-label">Dokter Tujuan Tambahan (opsional)</label>
+          <select name="dokter_cc_ids[]" id="dokter_cc_ids" class="form-select select2" multiple
+                  data-placeholder="Pilih 1 atau lebih dokter">
+          </select>
+          <small class="text-muted">Email rujukan juga dikirim ke semua dokter di sini.</small>
+          @error('dokter_cc_ids.*')<div class="text-danger small">{{ $message }}</div>@enderror
+        </div>
 
       {{-- Alasan --}}
       <div class="mb-3">
@@ -88,75 +99,94 @@
 
 @push('scripts')
 <script>
-(() => {
-  // ==== RS → Dokter (AJAX) ====
-  const rsSelect = document.getElementById('rs_tujuan_id');
-  const drSelect = document.getElementById('dokter_tujuan_id');
-  if (rsSelect && drSelect) {
-    const urlTpl = rsSelect.getAttribute('data-url');
-    function resetDr() {
-      drSelect.innerHTML = '<option value="">-- Pilih Dokter --</option>';
-      drSelect.disabled = true;
-    }
-    async function loadDr(rsId, preselect = @json(old('dokter_tujuan_id'))) {
-      if (!rsId) { resetDr(); return; }
-      try {
-        const res  = await fetch(urlTpl.replace('__ID__', rsId), { headers: {'X-Requested-With':'XMLHttpRequest'} });
-        const list = await res.json();
-        drSelect.innerHTML = '<option value="">-- Pilih Dokter --</option>';
-        list.forEach(d => {
-          const opt = document.createElement('option');
-          opt.value = d.id; opt.textContent = d.name;
-          if (preselect && String(preselect) === String(d.id)) opt.selected = true;
-          drSelect.appendChild(opt);
-        });
-        drSelect.disabled = false;
-      } catch (e) { console.error(e); resetDr(); }
-    }
-    rsSelect.addEventListener('change', e => loadDr(e.target.value));
-    const oldRs = @json(old('rumah_sakit_tujuan_id'));
-    if (oldRs) loadDr(oldRs);
+(function () {
+  const rs = document.getElementById('rs_tujuan_id');
+  const dr = document.getElementById('dokter_tujuan_id');   // single
+  const cc = document.getElementById('dokter_cc_ids');      // multi
+  if (!rs || !dr || !cc) return;
+
+  // init Select2 (kalau ada)
+  if (window.jQuery && jQuery.fn.select2 && !jQuery(cc).hasClass('select2-hidden-accessible')) {
+    jQuery(cc).select2({ width: '100%', placeholder: jQuery(cc).data('placeholder') });
   }
 
-  // ==== Anti double-submit + spinner ====
-  const form = document.getElementById('formRujukan');
-  const btn  = document.getElementById('btnSimpan');
-  if (!form || !btn) return;
+  const urlTpl = rs.getAttribute('data-url');
+  const preMain = @json(old('dokter_tujuan_id'));
+  const preCC   = @json(old('dokter_cc_ids', [])).map(String);
 
-  let locked = false;
+  const on = el => { if (el) { el.disabled = false; el.removeAttribute('disabled');
+    if (window.jQuery && jQuery.fn.select2 && jQuery(el).hasClass('select2')) {
+      jQuery(el).prop('disabled', false).trigger('change.select2');
+    }}};
+  const off = el => { if (el) { el.disabled = true; el.setAttribute('disabled','disabled');
+    if (window.jQuery && jQuery.fn.select2 && jQuery(el).hasClass('select2')) {
+      jQuery(el).prop('disabled', true).trigger('change.select2');
+    }}};
 
-  function lockUI() {
-    if (locked) return;
-    locked = true;
+  function resetOptions() {
+    dr.innerHTML = '<option value="">-- Pilih Dokter --</option>';
+    cc.innerHTML = '';
+  }
 
-    // disable submit buttons
-    form.querySelectorAll('button[type="submit"], input[type="submit"]').forEach(b => {
-      b.disabled = true;
-      b.setAttribute('aria-disabled', 'true');
-      b.classList.add('disabled');
-      const loadingText = b.dataset.loadingText || 'Menyimpan...';
-      if (b.tagName === 'BUTTON') {
-        const label = b.querySelector('.label');
-        const spin  = b.querySelector('.spinner-border');
-        if (label) label.textContent = loadingText;
-        if (spin)  spin.classList.remove('d-none');
-      } else {
-        b.value = loadingText;
+  async function reload(preMainId = preMain, preCcs = preCC) {
+    if (!rs.value) { resetOptions(); off(dr); off(cc); return; }
+    dr.innerHTML = '<option value="">Memuat…</option>'; off(dr); off(cc);
+
+    try {
+      const url = urlTpl.replace('__ID__', rs.value);
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: { 'X-Requested-With': 'XMLHttpRequest' },
+        credentials: 'same-origin'
+      });
+
+      const data = await res.json();
+      const list = Array.isArray(data) ? data : (Array.isArray(data?.data) ? data.data : []);
+
+      // isi single
+      dr.innerHTML = '<option value="">-- Pilih Dokter --</option>';
+      list.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id; opt.textContent = d.name;
+        if (preMainId && String(preMainId) === String(d.id)) opt.selected = true;
+        dr.appendChild(opt);
+      });
+      if (list.length === 0) {
+        dr.innerHTML = '<option value="">— Tidak ada dokter di RS ini —</option>';
       }
-    });
+
+      // isi multi
+      cc.innerHTML = '';
+      list.forEach(d => {
+        const opt = document.createElement('option');
+        opt.value = d.id; opt.textContent = d.name;
+        if (preCcs.includes(String(d.id))) opt.selected = true;
+        cc.appendChild(opt);
+      });
+      if (window.jQuery && jQuery.fn.select2) jQuery(cc).trigger('change.select2');
+
+      // setelah sukses, **paksa enable**
+      on(dr); on(cc);
+    } catch (e) {
+      console.error('Load dokter gagal:', e);
+      resetOptions();
+      // tetap enable supaya user bisa ganti RS / mencoba lagi
+      on(dr); on(cc);
+    }
   }
 
-  // kunci segera saat tombol diklik (tangkis double click cepat)
-  btn.addEventListener('click', () => {
-    setTimeout(() => { if (form.checkValidity()) lockUI(); }, 0);
-  });
+  // exposé, biar bisa dipanggil dari atribut onchange
+  window.__reloadDokter = reload;
 
-  // kunci saat submit; cegah submit kedua
-  form.addEventListener('submit', (e) => {
-    if (!form.checkValidity()) { locked = false; return; }
-    if (locked) { e.preventDefault(); return false; }
-    lockUI();
-  });
+  // load awal (kalau RS sudah terpilih)
+  if (rs.value) reload(); else { resetOptions(); off(dr); off(cc); }
+
+  // watchdog: kalau ada script lain yang re-disable, kita paksa enable saat RS ada
+  setInterval(() => { if (rs.value) { on(dr); on(cc); } }, 800);
+
+  // kalau RS diganti manual (cadangan selain atribut onchange)
+  rs.addEventListener('change', () => reload(null, []));
 })();
 </script>
 @endpush
+

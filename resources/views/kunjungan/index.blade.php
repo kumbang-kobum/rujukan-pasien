@@ -69,7 +69,7 @@
                         <th>No. Rawat</th>
                         <th>Pasien</th>
                         <th>Dokter</th>
-                        <th>Poli</th>
+                        <th>Rawat Jalan / Rawat Inap</th>
                         <th>Tanggal</th>
                         <th>Status</th>
                         <th>Penerima</th>
@@ -85,7 +85,7 @@
                             {{ $k->pasien->no_rkm_medis ?? '-' }} — {{ $k->pasien->nama ?? '-' }}
                         </td>
                         <td>{{ $k->dokter->name ?? '-' }}</td>
-                        <td>{{ $k->poli }}</td>
+                        <td>{{ $k->rajalranap }}</td>
                         <td class="text-nowrap">
                             {{ \Carbon\Carbon::parse($k->tanggal_kunjungan)->format('d/m/Y') }}
                             @if($k->waktu_masuk)

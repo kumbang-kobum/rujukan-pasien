@@ -4,6 +4,11 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\SOAP;
+use App\Models\Pasien;
+use App\Models\User;
+use App\Models\Rujukan;
+use App\Models\BerkasMedis;
 
 class Kunjungan extends Model
 {
@@ -18,6 +23,7 @@ class Kunjungan extends Model
         'user_id',
         'rumah_sakit_id',
         'poli',
+        'rajalranap',
         'tanggal_kunjungan',
         'waktu_masuk',
         'keluhan_utama',
@@ -49,7 +55,7 @@ class Kunjungan extends Model
 
     public function soap()
     {
-        return $this->hasMany(Soap::class);
+        return $this->hasMany(SOAP::class);
     }
 
     public function rujukan()
@@ -57,8 +63,14 @@ class Kunjungan extends Model
         return $this->hasOne(Rujukan::class);
     }
 
+    public function konsultasi()
+    {
+        return $this->hasMany(Konsultasi::class, 'kunjungan_id');
+    }
+
     public function berkasMedis()
     {
-        return $this->hasMany(BerkasMedis::class, 'kunjungan_id');
+        return $this->hasMany(BerkasMedis::class, 'kunjungan_id')
+                    ->orderByDesc('created_at');;
     }
 }

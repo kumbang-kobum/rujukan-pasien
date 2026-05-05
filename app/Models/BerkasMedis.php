@@ -12,16 +12,17 @@ class BerkasMedis extends Model
     protected $table = 'berkas_medis';
 
     protected $fillable = [
-        'kunjungan_id',
-        'uploader_id',
-        'jenis',
-        'nama_file',
-        'path',
+        'kunjungan_id','soap_id','kategori','nama_file','path','mime','uploader_id'
     ];
+
+    public function soap()
+    { 
+        return $this->belongsTo(SOAP::class, 'soap_id'); 
+    }
 
     public function kunjungan()
     {
-        return $this->belongsTo(Kunjungan::class);
+        return $this->belongsTo(Kunjungan::class, 'kunjungan_id');
     }
 
     public function uploader()

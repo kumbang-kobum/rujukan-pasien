@@ -20,17 +20,28 @@
 
             <div class="mb-3">
                 <label>Pemeriksa (Dokter)</label>
-                <input type="number" name="dokter_id" class="form-control" value="{{ $kunjungan->dokter_id }}" required>
+                <select name="dokter_id" class="form-select" required>
+                    @foreach($dokter as $d)
+                        <option value="{{ $d->id }}" {{ (int)$kunjungan->dokter_id === (int)$d->id ? 'selected' : '' }}>
+                            {{ $d->name }}
+                        </option>
+                    @endforeach
+                </select>
             </div>
 
             <div class="mb-3">
-                <label>Poli</label>
-                <input type="text" name="poli" class="form-control" value="{{ $kunjungan->poli }}" required>
+                <label>Rawat Jalan / Rawat Inap</label>
+                <input type="text" name="rajalranap" class="form-control" value="{{ $kunjungan->rajalranap }}" required>
             </div>
 
             <div class="mb-3">
                 <label>Tanggal Kunjungan</label>
-                <input type="date" name="tanggal_kunjungan" class="form-control" value="{{ $kunjungan->tanggal_kunjungan }}" required>
+                <input type="date" name="tanggal_kunjungan" class="form-control" value="{{ $tanggal_default }}" required>
+            </div>
+
+            <div class="mb-3">
+                <label>Waktu Masuk</label>
+                <input type="time" name="waktu_masuk" class="form-control" value="{{ $jam_default }}" required>
             </div>
 
             <div class="mb-3">

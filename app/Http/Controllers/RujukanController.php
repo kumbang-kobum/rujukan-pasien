@@ -8,13 +8,44 @@ use App\Models\RumahSakit;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Support\Facades\Notification;
 use App\Notifications\RujukanMasukNotification;
 
 class RujukanController extends Controller
 {
+    
+    // di dalam class RujukanController
+    private function assertViewable(Rujukan $rujukan): void
+    {
+        $user = auth()->user();
+        if ($user->role === 'admin') return;
+    
+        $rsId = (int) $user->rumah_sakit_id;
+        abort_unless(
+            in_array($rsId, [(int)$rujukan->rumah_sakit_asal_id, (int)$rujukan->rumah_sakit_tujuan_id], true),
+            403
+        );
+    }
+    
+    /** hanya RS asal (atau admin) yang boleh mengubah isi rujukan */
+    private function assertManage(Rujukan $rujukan): void
+    {
+        $user = auth()->user();
+        abort_unless(
+            $user->role === 'admin'
+            || (int)$user->rumah_sakit_id === (int)$rujukan->rumah_sakit_asal_id
+            || (int)$user->rumah_sakit_id === (int)$rujukan->rumah_sakit_tujuan_id,
+            403
+        );
+    }
+
     public function index(Request $request)
     {
-        $q = Rujukan::query()->with(['kunjungan.pasien','rsAsal','rsTujuan','dokterTujuan','penerima']);
+        $user = auth()->user();
+    
+        $q = Rujukan::query()
+            ->visibleTo($user) // ⬅️ kunci utama pembatasan list
+            ->with(['kunjungan.pasien','rsAsal','rsTujuan','dokterTujuan','penerima']);
 
         // Keyword: no_rawat / no_rkm_medis / nama pasien / alasan / catatan
         if ($kw = trim($request->input('keyword', ''))) {
@@ -80,7 +111,7 @@ class RujukanController extends Controller
         // Dropdown sumber data
         $rsList = RumahSakit::orderBy('nama')->get(['id','nama']);
         $dokterList = collect();
-        if (!empty($rsTujuan)) {
+        if ($rsTujuan = $request->input('rs_tujuan_id')) {
             $dokterList = User::where('role','dokter')
                 ->where('rumah_sakit_id', $rsTujuan)
                 ->orderBy('name')->get(['id','name']);
@@ -113,24 +144,30 @@ class RujukanController extends Controller
     public function store(Request $request)
     {
         $rsAsalId = (int) auth()->user()->rumah_sakit_id;
-
+    
         $request->validate([
-            'kunjungan_id'          => ['required','exists:kunjungan,id'],
-            // kirimkan dari form sbg hidden agar transparan
-            'rumah_sakit_asal_id'   => ['required','in:'.$rsAsalId],
-            'rumah_sakit_tujuan_id' => ['required','exists:rumah_sakit,id','different:rumah_sakit_asal_id'],
+            'kunjungan_id'          => ['required', Rule::exists(Kunjungan::class, 'id')],
+            'rumah_sakit_asal_id'   => ['required', Rule::in([$rsAsalId])],
+            'rumah_sakit_tujuan_id' => ['required', Rule::exists(RumahSakit::class, 'id'), 'different:rumah_sakit_asal_id'],
             'dokter_tujuan_id'      => [
                 'required',
-                Rule::exists('users','id')->where(function ($q) use ($request) {
-                    $q->where('role','dokter')
-                      ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
+                Rule::exists(User::class,'id')->where(function ($q) use ($request) {
+                    $q->where('role','dokter')->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
+                }),
+            ],
+            // ⬇️ multi-pilih tembusan (opsional)
+            'dokter_cc_ids'         => ['nullable','array'],
+            'dokter_cc_ids.*'       => [
+                'integer','different:dokter_tujuan_id',
+                Rule::exists(User::class,'id')->where(function ($q) use ($request) {
+                    $q->where('role','dokter')->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],
             'alasan'                => ['required','string','max:255'],
             'alasan_rujukan'        => ['nullable','string'],
             'catatan'               => ['nullable','string'],
         ]);
-
+    
         $rujukan = Rujukan::create([
             'kunjungan_id'           => $request->kunjungan_id,
             'rumah_sakit_asal_id'    => $rsAsalId,
@@ -141,40 +178,55 @@ class RujukanController extends Controller
             'catatan'                => $request->catatan,
             'status'                 => 'menunggu',
         ]);
-
-        $dokter = User::find($request->dokter_tujuan_id);
-        $tujuan = RumahSakit::find($request->rumah_sakit_tujuan_id);
-
-        // jika mau khususkan hanya untuk RSUD Sungai Dareh, buka IF berikut:
-        if ($dokter && filter_var($dokter->email, FILTER_VALIDATE_EMAIL)) {
-            // contoh pembatasan opsional:
-            // if (str($tujuan->nama)->lower()->contains('rsud sungai dareh')) {
-                $dokter->notify(new RujukanMasukNotification($rujukan, auth()->user()));
-            // }
+    
+        $ccIds = collect($request->input('dokter_cc_ids', []))
+            ->map(function ($v) { return (int) $v; })
+            ->unique()
+            ->values();
+        
+        $rujukan->dokterCc()->sync($ccIds);
+        
+        // kirim email ke dokter utama + semua CC
+        $recipientIds = $ccIds->push((int)$request->dokter_tujuan_id)->unique()->values();
+        $recipients   = User::whereIn('id', $recipientIds)->whereNotNull('email')->get();
+        if ($recipients->isNotEmpty()) {
+            Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
         }
-
-        return redirect()->route('rujukan.index')->with('success','Rujukan berhasil ditambahkan.');
+    
+        return redirect()->route('rujukan.index')
+            ->with('success','Rujukan berhasil ditambahkan & email dikirim ke dokter tujuan/tembusan.');
     }
 
     public function edit(Rujukan $rujukan)
     {
-        $kunjungan   = Kunjungan::with('pasien')->orderByDesc('tanggal_kunjungan')->get();
-        $rsAsalId    = (int) $rujukan->rumah_sakit_asal_id;
-
-        $rumahSakitTujuan = RumahSakit::where('id', '!=', $rsAsalId)->orderBy('nama')->get();
-
-        // dokter untuk RS tujuan yang sudah tersimpan
+        $this->assertViewable($rujukan);
+        $this->assertManage($rujukan);
+    
+        $kunjungan = Kunjungan::with('pasien')->orderByDesc('tanggal_kunjungan')->get();
+        $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
+    
+        $rumahSakitTujuan = RumahSakit::where('id','!=',$rsAsalId)->orderBy('nama')->get();
+    
         $dokter = User::where('role','dokter')
             ->where('rumah_sakit_id', $rujukan->rumah_sakit_tujuan_id)
             ->orderBy('name')->get();
-
-        return view('rujukan.edit', compact('rujukan','kunjungan','rumahSakitTujuan','dokter','rsAsalId'));
+    
+        $ccTerpilih = $rujukan->dokterCc()->pluck('users.id')->all();
+    
+        return view('rujukan.edit', compact('rujukan','kunjungan','rumahSakitTujuan','dokter','rsAsalId','ccTerpilih'));
     }
 
     public function update(Request $request, Rujukan $rujukan)
     {
-        $rsAsalId = (int) $rujukan->rumah_sakit_asal_id; // RS asal tidak boleh diubah sembarang
-
+        $this->assertViewable($rujukan);
+        $this->assertManage($rujukan);
+    
+        $rsAsalId = (int) $rujukan->rumah_sakit_asal_id;
+    
+        // SIMPAN NILAI LAMA SEBELUM UPDATE
+        $oldDokterId = (int) $rujukan->dokter_tujuan_id;
+        $oldRsTujuan = (int) $rujukan->rumah_sakit_tujuan_id;
+    
         $request->validate([
             'kunjungan_id'          => ['required','exists:kunjungan,id'],
             'rumah_sakit_asal_id'   => ['required','in:'.$rsAsalId],
@@ -186,12 +238,21 @@ class RujukanController extends Controller
                       ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],
+            // tambahkan validasi CC (opsional, tapi disarankan)
+            'dokter_cc_ids'   => ['nullable','array'],
+            'dokter_cc_ids.*' => [
+                'integer','different:dokter_tujuan_id',
+                Rule::exists('users','id')->where(function ($q) use ($request) {
+                    $q->where('role','dokter')
+                      ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
+                }),
+            ],
             'alasan'                => ['required','string','max:255'],
             'alasan_rujukan'        => ['nullable','string'],
             'catatan'               => ['nullable','string'],
             'status'                => ['required','in:menunggu,diterima,ditolak'],
         ]);
-
+    
         $rujukan->update([
             'kunjungan_id'           => $request->kunjungan_id,
             'rumah_sakit_asal_id'    => $rsAsalId,
@@ -202,28 +263,44 @@ class RujukanController extends Controller
             'catatan'                => $request->catatan,
             'status'                 => $request->status,
         ]);
-
-        // ambil nilai lama
-        $oldDokterId = $rujukan->dokter_tujuan_id;
-        $oldRsTujuan = $rujukan->rumah_sakit_tujuan_id;
-
-        // ... validasi & $rujukan->update([...]) seperti sekarang ...
-
-        // jika tujuan/dokter berubah, kirim notifikasi lagi
-        if ($oldDokterId != $rujukan->dokter_tujuan_id || $oldRsTujuan != $rujukan->rumah_sakit_tujuan_id) {
-            $dokterBaru = User::find($rujukan->dokter_tujuan_id);
-            if ($dokterBaru && filter_var($dokterBaru->email, FILTER_VALIDATE_EMAIL)) {
-                $dokterBaru->notify(new RujukanMasukNotification($rujukan, auth()->user()));
+    
+        // --- Kirim email bila perlu ---
+        $ccIds = collect($request->input('dokter_cc_ids', []))
+            ->map(function ($v) { return (int) $v; })
+            ->unique()
+            ->values();
+        
+        $rujukan->dokterCc()->sync($ccIds);
+    
+        $dokterBerubah = ($oldDokterId !== (int)$rujukan->dokter_tujuan_id) 
+                      || ($oldRsTujuan !== (int)$rujukan->rumah_sakit_tujuan_id);
+    
+        // Kirim ke dokter tujuan bila berubah ATAU bila ada CC (biar si tujuan juga terima saat ada CC)
+        $recipientIds = collect();
+        if ($dokterBerubah || $ccIds->isNotEmpty()) {
+            $recipientIds->push((int)$rujukan->dokter_tujuan_id);
+        }
+        $recipientIds = $recipientIds->merge($ccIds)->unique()->values();
+    
+        if ($recipientIds->isNotEmpty()) {
+            $recipients = User::whereIn('id', $recipientIds)
+                ->whereNotNull('email')
+                ->get();
+    
+            if ($recipients->isNotEmpty()) {
+                Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
             }
         }
-
+    
         return redirect()->route('rujukan.index')->with('success','Rujukan berhasil diperbarui.');
     }
 
     public function destroy(Rujukan $rujukan)
     {
+        $this->assertViewable($rujukan);
         abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
         $rujukan->delete();
+        
         return back()->with('success','Rujukan dihapus.');
     }
 
@@ -245,6 +322,9 @@ class RujukanController extends Controller
 
     public function show(Rujukan $rujukan)
     {
+        $this->assertViewable($rujukan);
+        $rujukan->load(['kunjungan.pasien', 'rsAsal', 'rsTujuan', 'dokterTujuan', 'penerima']);
+
         return view('rujukan.show', compact('rujukan'));
     }
 }

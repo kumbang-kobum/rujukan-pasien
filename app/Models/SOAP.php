@@ -18,8 +18,17 @@ class SOAP extends Model
         'objektif',
         'assessment',
         'plan',
+        'advice',
+        'td_sys',
+        'td_dia',
+        'map',
     ];
 
+    public function berkas()
+    { 
+        return $this->hasMany(BerkasMedis::class,'soap_id'); 
+    }
+    
     public function kunjungan()
     {
         return $this->belongsTo(Kunjungan::class);

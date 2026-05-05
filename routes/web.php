@@ -8,9 +8,12 @@ use App\Http\Controllers\KunjunganController;
 use App\Http\Controllers\SOAPController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BerkasMedisController;
+use App\Http\Controllers\AjaxRujukanController;
 use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\AdminController;
+use App\Http\Controllers\KonsultasiController;
 use App\Http\Controllers\RumahSakitController;
+use App\Http\Controllers\ProfileController;
 
 
 Route::get('/', function () {
@@ -39,16 +42,29 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('admin/pegawai', AdminController::class);
     });
 
+    // Profile
+    Route::prefix('profile')->name('profile.')->group(function () {
+        Route::get('/',   [ProfileController::class, 'edit'])->name('edit');
+        Route::patch('/', [ProfileController::class, 'update'])->name('update');
+        Route::delete('/',[ProfileController::class, 'destroy'])->name('destroy');
+    });
+    
+    Route::put('/password', [ProfileController::class, 'updatePassword'])->name('password.update');
+
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    // AJAX: dokter by RS
-    Route::get('/ajax/dokter-by-rs/{rs}', [UserController::class, 'dokterByRs'])
-        ->name('ajax.dokter-by-rs');
+    Route::get('/ajax/dokter-by-rs/{rs}', [AjaxRujukanController::class, 'dokterByRs'])
+            ->name('ajax.dokter-by-rs');
 
     Route::resource('users', UserController::class);
     Route::resource('pasien', PasienController::class);
     Route::resource('soap', SOAPController::class);
     Route::resource('rujukan', RujukanController::class);
+    Route::resource('konsultasi', KonsultasiController::class);
+    Route::patch('/konsultasi/{konsultasi}/accept', [KonsultasiController::class, 'accept'])->name('konsultasi.accept');
+    Route::post('/konsultasi/{konsultasi}/reply', [KonsultasiController::class, 'reply'])->name('konsultasi.reply');
+    Route::patch('/konsultasi/{konsultasi}/close', [KonsultasiController::class, 'close'])->name('konsultasi.close');
+    Route::post('/konsultasi/{konsultasi}/escalate', [KonsultasiController::class, 'escalate'])->name('konsultasi.escalate');
     Route::resource('berkas', BerkasMedisController::class);
 
     // Kunjungan routes
