@@ -23,24 +23,6 @@
       </div>
 
       <div class="row">
-        <div class="col-md-4 mb-3">
-          <label class="form-label">Practitioner IHS</label>
-          <input type="text" name="practitioner_ihs_number" class="form-control" value="{{ old('practitioner_ihs_number') }}">
-          @error('practitioner_ihs_number') <div class="text-danger small">{{ $message }}</div> @enderror
-        </div>
-        <div class="col-md-4 mb-3">
-          <label class="form-label">PractitionerRole ID</label>
-          <input type="text" name="satusehat_practitioner_role_id" class="form-control" value="{{ old('satusehat_practitioner_role_id') }}">
-          @error('satusehat_practitioner_role_id') <div class="text-danger small">{{ $message }}</div> @enderror
-        </div>
-        <div class="col-md-4 mb-3">
-          <label class="form-label">Spesialisasi</label>
-          <input type="text" name="spesialisasi" class="form-control" value="{{ old('spesialisasi') }}">
-          @error('spesialisasi') <div class="text-danger small">{{ $message }}</div> @enderror
-        </div>
-      </div>
-
-      <div class="row">
         <div class="col-md-6 mb-3">
           <label class="form-label">Password</label>
           <div class="position-relative">

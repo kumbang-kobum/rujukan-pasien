@@ -5,6 +5,16 @@
 .env.production
 .phpactor.json
 .phpunit.result.cache
+/404.html
+/502.html
+/:
+/_
+/__MACOSX
+/docs.zip
+/index.html
+/rujukan-pasien.rar
+/www
+/www.zip
 /.fleet
 /.idea
 /.nova
@@ -16,6 +26,9 @@
 /public/build
 /public/hot
 /public/storage
+/public/storage.backup
+/public/.user.ini
+/public/.well-known/acme-challenge
 /storage/*.key
 /storage/pail
 /vendor

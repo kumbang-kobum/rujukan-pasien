@@ -32,7 +32,6 @@ class RumahSakitController extends Controller
     {
         $data = $request->validate([
             'nama'    => ['required','string','max:100','unique:rumah_sakit,nama'],
-            'organization_ihs_number' => ['nullable','string','max:100','unique:rumah_sakit,organization_ihs_number'],
             'alamat'  => ['nullable','string','max:255'],
             'telepon' => ['nullable','string','max:50'],
         ]);
@@ -51,7 +50,6 @@ class RumahSakitController extends Controller
     {
         $data = $request->validate([
             'nama'    => ['required','string','max:100','unique:rumah_sakit,nama,'.$rumahsakit->id],
-            'organization_ihs_number' => ['nullable','string','max:100','unique:rumah_sakit,organization_ihs_number,'.$rumahsakit->id],
             'alamat'  => ['nullable','string','max:255'],
             'telepon' => ['nullable','string','max:50'],
         ]);

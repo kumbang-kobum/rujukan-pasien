@@ -27,11 +27,6 @@
       </div>
 
       <div class="mb-3">
-        <label class="form-label">Encounter SATUSEHAT</label>
-        <input type="text" name="satusehat_encounter_id" class="form-control" value="{{ old('satusehat_encounter_id') }}">
-      </div>
-
-      <div class="mb-3">
         <label class="form-label">Rawat Jalan / Rawat Inap</label>
         <input type="text" name="rajalranap" class="form-control" required>
       </div>

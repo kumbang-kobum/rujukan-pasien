@@ -39,12 +39,14 @@ class RegisteredUserController extends Controller
         $user = User::create([
             'name' => $request->name,
             'email' => $request->email,
-            'rumah_sakit_id' => RumahSakit::query()->value('id') ?? RumahSakit::create([
-                'nama' => 'Rumah Sakit Default',
-                'alamat' => 'Belum diatur',
-                'telepon' => '-',
-            ])->id,
             'password' => Hash::make($request->password),
+            'role' => 'dokter',
+            'rumah_sakit_id' => RumahSakit::query()->value('id')
+                ?? RumahSakit::create([
+                    'nama' => 'RS Default',
+                    'alamat' => 'Alamat belum diisi',
+                    'telepon' => '-',
+                ])->id,
         ]);
 
         event(new Registered($user));

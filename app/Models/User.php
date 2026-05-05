@@ -18,9 +18,6 @@ class User extends Authenticatable
     protected $fillable = [
         'name',
         'email',
-        'practitioner_ihs_number',
-        'satusehat_practitioner_role_id',
-        'spesialisasi',
         'password',
         'avatar_path',
         'role',
@@ -73,10 +70,5 @@ class User extends Authenticatable
     public function konsultasiDiterima()
     {
         return $this->hasMany(Konsultasi::class, 'dokter_tujuan_id');
-    }
-
-    public function pesanKonsultasi()
-    {
-        return $this->hasMany(KonsultasiPesan::class, 'pengirim_id');
     }
 }

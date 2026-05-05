@@ -1,27 +1,25 @@
 @extends('layouts.app')
-@section('title','Edit Konsultasi')
+@section('title', 'Edit Konsultasi')
 
 @section('content')
-<div class="card shadow-sm">
-  <div class="card-header bg-warning text-dark">
-    <i class="fas fa-edit me-2"></i> Edit Konsultasi {{ $konsultasi->no_konsultasi }}
-  </div>
-  <div class="card-body">
-    <form method="POST" action="{{ route('konsultasi.update', $konsultasi) }}">
-      @csrf
-      @method('PUT')
-      @include('konsultasi.form')
-
-      <div class="mt-4 d-flex gap-2 flex-wrap">
-        <button type="submit" name="action" value="draft" class="btn btn-outline-secondary">
-          <i class="fas fa-save me-1"></i> Simpan Perubahan
-        </button>
-        <button type="submit" name="action" value="submit" class="btn btn-warning">
-          <i class="fas fa-paper-plane me-1"></i> Simpan & Kirim
-        </button>
-        <a href="{{ route('konsultasi.show', $konsultasi) }}" class="btn btn-secondary">Kembali</a>
-      </div>
-    </form>
-  </div>
+<div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+    <div>
+        <h4 class="mb-1">Edit Draft Konsultasi</h4>
+        <div class="text-muted">Draft masih bisa diubah sebelum dikirim ke dokter tujuan.</div>
+    </div>
+    <a href="{{ route('konsultasi.show', $konsultasi) }}" class="btn btn-outline-secondary">Kembali</a>
 </div>
+
+@if($errors->any())
+    <div class="alert alert-danger">
+        <div class="fw-semibold mb-1">Perubahan belum bisa disimpan.</div>
+        <ul class="mb-0 ps-3">
+            @foreach($errors->all() as $error)
+                <li>{{ $error }}</li>
+            @endforeach
+        </ul>
+    </div>
+@endif
+
+@include('konsultasi._form')
 @endsection

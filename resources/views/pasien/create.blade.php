@@ -16,10 +16,6 @@
                 <input type="text" name="nik" class="form-control">
             </div>
             <div class="mb-3">
-                <label>Patient IHS Number</label>
-                <input type="text" name="patient_ihs_number" class="form-control" value="{{ old('patient_ihs_number') }}">
-            </div>
-            <div class="mb-3">
                 <label>Nama</label>
                 <input type="text" name="nama" class="form-control" required>
             </div>

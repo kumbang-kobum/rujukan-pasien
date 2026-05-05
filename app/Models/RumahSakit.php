@@ -10,7 +10,7 @@ class RumahSakit extends Model
     use HasFactory;
 
     protected $table = 'rumah_sakit'; // nama tabel di DB
-    protected $fillable = ['nama','organization_ihs_number','alamat','telepon'];
+    protected $fillable = ['nama','alamat','telepon'];
     protected $casts = [
         'id' => 'integer',
     ];
@@ -18,15 +18,5 @@ class RumahSakit extends Model
     public function users()
     {
         return $this->hasMany(User::class, 'rumah_sakit_id');
-    }
-
-    public function konsultasiAsal()
-    {
-        return $this->hasMany(Konsultasi::class, 'rumah_sakit_asal_id');
-    }
-
-    public function konsultasiTujuan()
-    {
-        return $this->hasMany(Konsultasi::class, 'rumah_sakit_tujuan_id');
     }
 }

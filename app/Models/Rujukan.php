@@ -13,7 +13,6 @@ class Rujukan extends Model
     protected $table = 'rujukan';
     protected $fillable = [
         'kunjungan_id',
-        'origin_konsultasi_id',
         'rumah_sakit_asal_id',
         'rumah_sakit_tujuan_id',
         'dokter_tujuan_id',
@@ -73,10 +72,4 @@ class Rujukan extends Model
         return $this->belongsToMany(User::class, 'rujukan_dokter_cc', 'rujukan_id', 'dokter_id')
                     ->withTimestamps();
     }
-
-    public function originKonsultasi()
-    {
-        return $this->belongsTo(Konsultasi::class, 'origin_konsultasi_id');
-    }
-
 }

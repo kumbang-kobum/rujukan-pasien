@@ -110,6 +110,23 @@
           -webkit-backdrop-filter: blur(10px);
           border: 1px solid rgba(6,95,70,.15);
         }
+        .notification-menu{min-width:340px;max-width:380px}
+        .notification-item{white-space:normal}
+        .notification-item.unread{
+          background: rgba(37,99,235,.08);
+          border-left: 3px solid rgba(37,99,235,.8);
+        }
+        .notification-badge{
+          position:absolute;
+          top:-4px;
+          right:-4px;
+          min-width:18px;
+          height:18px;
+          padding:0 5px;
+          border-radius:999px;
+          font-size:.7rem;
+          line-height:18px;
+        }
 
         /*.navbar-glass{backdrop-filter:blur(6px); background:rgba(17,24,39,.92)}*/
         /*.navbar .nav-link{padding:.55rem .9rem; border-radius:999px}*/
@@ -192,10 +209,7 @@
                         @if(Auth::user()->isDokter() || Auth::user()->isAdmin())
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('konsultasi.*') ? 'active' : '' }}" href="{{ route('konsultasi.index') }}">
-                                <i class="fas fa-comment-medical"></i> Konsultasi
-                                @if(($konsultasiAttentionCount ?? 0) > 0)
-                                    <span class="badge rounded-pill bg-danger ms-1">{{ $konsultasiAttentionCount }}</span>
-                                @endif
+                                <i class="fas fa-comment-medical me-1"></i> Konsultasi Antar Dokter
                             </a>
                         </li>
                         @endif
@@ -218,48 +232,40 @@
                 {{-- Right Dropdown --}}
                 @auth
                 <div class="d-flex align-items-center gap-2">
+                  @if(Auth::user()->isDokter() || Auth::user()->isAdmin())
                   <div class="dropdown">
-                    <a class="btn btn-glass-emerald rounded-pill px-3 position-relative" href="#" id="dropdownNotif" data-bs-toggle="dropdown" aria-expanded="false">
+                    <a class="btn btn-glass-emerald rounded-pill px-3 position-relative"
+                       href="#" id="dropdownNotif" data-bs-toggle="dropdown" aria-expanded="false">
                       <i class="fas fa-bell"></i>
-                      @if(($unreadNotificationCount ?? 0) > 0)
-                        <span class="position-absolute top-0 start-100 translate-middle badge rounded-pill bg-danger">
-                          {{ $unreadNotificationCount }}
-                        </span>
+                      @if(($konsultasiNotificationCount ?? 0) > 0)
+                        <span class="badge bg-danger notification-badge">{{ $konsultasiNotificationCount > 9 ? '9+' : $konsultasiNotificationCount }}</span>
                       @endif
                     </a>
-                    <div class="dropdown-menu dropdown-menu-end shadow p-0" style="min-width: 360px;">
-                      <div class="d-flex justify-content-between align-items-center px-3 py-2 border-bottom">
-                        <div>
-                          <div class="fw-semibold">Notifikasi</div>
-                          <div class="small text-muted">Aktivitas konsultasi terbaru</div>
-                        </div>
-                        @if(($unreadNotificationCount ?? 0) > 0)
-                          <form method="POST" action="{{ route('notifications.read-all') }}">
-                            @csrf
-                            <button class="btn btn-sm btn-outline-secondary">Tandai semua</button>
-                          </form>
+                    <div class="dropdown-menu dropdown-menu-end shadow notification-menu p-0" aria-labelledby="dropdownNotif">
+                      <div class="px-3 py-2 border-bottom d-flex justify-content-between align-items-center">
+                        <span class="fw-semibold">Notifikasi Konsultasi</span>
+                        @if(($konsultasiNotificationCount ?? 0) > 0)
+                          <span class="badge bg-danger">{{ $konsultasiNotificationCount }} baru</span>
                         @endif
                       </div>
-
-                      @forelse(($notificationItems ?? collect()) as $notification)
-                        <form method="POST" action="{{ route('notifications.read', $notification->id) }}">
-                          @csrf
-                          <button type="submit" class="dropdown-item px-3 py-3 {{ $notification->read_at ? '' : 'bg-light' }}">
-                            <div class="d-flex justify-content-between align-items-start gap-3">
-                              <div class="text-start">
-                                <div class="fw-semibold">{{ $notification->data['title'] ?? 'Notifikasi' }}</div>
-                                <div class="small text-muted multiline">{{ $notification->data['message'] ?? '-' }}</div>
-                              </div>
-                              <div class="small text-muted text-nowrap">{{ $notification->created_at?->diffForHumans() }}</div>
-                            </div>
-                          </button>
-                        </form>
+                      @forelse(($konsultasiNotifications ?? collect()) as $notification)
+                        <a
+                          href="{{ $notification->data['url'] ?? route('konsultasi.index') }}"
+                          class="dropdown-item notification-item px-3 py-2 {{ is_null($notification->read_at) ? 'unread' : '' }}"
+                        >
+                          <div class="fw-semibold small mb-1">{{ $notification->data['judul'] ?? 'Konsultasi' }}</div>
+                          <div class="small text-muted mb-1">{{ $notification->data['message'] ?? 'Ada pembaruan konsultasi.' }}</div>
+                          <div class="small text-muted">{{ $notification->created_at->diffForHumans() }}</div>
+                        </a>
                       @empty
-                        <div class="px-3 py-4 text-center text-muted small">Belum ada notifikasi.</div>
+                        <div class="px-3 py-3 small text-muted">Belum ada notifikasi konsultasi.</div>
                       @endforelse
+                      <div class="border-top px-3 py-2 text-center">
+                        <a href="{{ route('konsultasi.index') }}" class="small text-decoration-none">Buka daftar konsultasi</a>
+                      </div>
                     </div>
                   </div>
-
+                  @endif
                   <div class="dropdown">
                     <a class="btn btn-glass-emerald rounded-pill px-3 d-flex align-items-center gap-2"
                        href="#" id="dropdownUser" data-bs-toggle="dropdown">

@@ -11,234 +11,20 @@ use App\Models\RumahSakit;
 use App\Models\User;
 use App\Notifications\KonsultasiActivityNotification;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Notification;
-use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class KonsultasiController extends Controller
 {
-    private function ensureClinicalDoctor(): void
-    {
-        abort_unless(auth()->user()?->isDokter() || auth()->user()?->isAdmin(), 403);
-    }
-
-    private function assertViewable(Konsultasi $konsultasi): void
-    {
-        $user = auth()->user();
-
-        abort_unless($konsultasi->isVisibleTo($user), 403);
-    }
-
-    private function assertSourceAccess(Konsultasi $konsultasi): void
-    {
-        $user = auth()->user();
-
-        if ($user->isAdmin()) {
-            return;
-        }
-
-        abort_unless(
-            $user->isDokter() &&
-            (
-                (int) $user->id === (int) $konsultasi->dokter_pengirim_id ||
-                (int) $user->rumah_sakit_id === (int) $konsultasi->rumah_sakit_asal_id
-            ),
-            403
-        );
-    }
-
-    private function assertTargetDoctorAccess(Konsultasi $konsultasi): void
-    {
-        $user = auth()->user();
-
-        if ($user->isAdmin()) {
-            return;
-        }
-
-        abort_unless(
-            $user->isDokter() && (int) $user->id === (int) $konsultasi->dokter_tujuan_id,
-            403
-        );
-    }
-
-    private function assertParticipant(Konsultasi $konsultasi): void
-    {
-        $user = auth()->user();
-
-        if ($user->isAdmin()) {
-            return;
-        }
-
-        abort_unless(
-            $user->isDokter() &&
-            in_array((int) $user->id, [(int) $konsultasi->dokter_pengirim_id, (int) $konsultasi->dokter_tujuan_id], true),
-            403
-        );
-    }
-
-    private function generateNoKonsultasi(): string
-    {
-        $prefix = 'KON-' . now()->format('Ymd');
-        $last = Konsultasi::where('no_konsultasi', 'like', $prefix . '-%')
-            ->orderByDesc('no_konsultasi')
-            ->value('no_konsultasi');
-
-        $nextNumber = 1;
-        if ($last) {
-            $parts = explode('-', $last);
-            $nextNumber = ((int) end($parts)) + 1;
-        }
-
-        return $prefix . '-' . str_pad((string) $nextNumber, 4, '0', STR_PAD_LEFT);
-    }
-
-    private function consentReady(array $data): bool
-    {
-        return !empty($data['consent_confirmed'])
-            && !empty($data['consent_granted_by_name'])
-            && !empty($data['consent_granted_by_role'])
-            && !empty($data['consent_method'])
-            && !empty($data['consent_granted_at']);
-    }
-
-    private function audit(Konsultasi $konsultasi, string $eventType, string $deskripsi, array $payload = []): void
-    {
-        KonsultasiAuditLog::create([
-            'konsultasi_id' => $konsultasi->id,
-            'actor_user_id' => auth()->id(),
-            'event_type' => $eventType,
-            'deskripsi' => $deskripsi,
-            'payload' => $payload ?: null,
-            'ip_address' => request()->ip(),
-            'user_agent' => request()->userAgent(),
-        ]);
-    }
-
-    private function notifyUsers(array $recipientIds, Konsultasi $konsultasi, string $title, string $message, string $category): void
-    {
-        if (!Schema::hasTable('notifications')) {
-            return;
-        }
-
-        $recipientIds = collect($recipientIds)
-            ->filter()
-            ->map(fn ($id) => (int) $id)
-            ->reject(fn ($id) => $id === (int) auth()->id())
-            ->unique()
-            ->values();
-
-        if ($recipientIds->isEmpty()) {
-            return;
-        }
-
-        $recipients = User::whereIn('id', $recipientIds)->get();
-
-        if ($recipients->isEmpty()) {
-            return;
-        }
-
-        Notification::send(
-            $recipients,
-            new KonsultasiActivityNotification($konsultasi, $title, $message, $category, auth()->user())
-        );
-    }
-
-    private function markRelatedNotificationsAsRead(Konsultasi $konsultasi): void
-    {
-        if (!Schema::hasTable('notifications') || !auth()->check()) {
-            return;
-        }
-
-        $notifications = auth()->user()
-            ->unreadNotifications
-            ->filter(fn ($notification) => (int) ($notification->data['konsultasi_id'] ?? 0) === (int) $konsultasi->id);
-
-        if ($notifications->isNotEmpty()) {
-            $notifications->markAsRead();
-        }
-    }
-
-    private function markConsultationAsRead(Konsultasi $konsultasi): void
-    {
-        $user = auth()->user();
-
-        if (
-            !$user ||
-            !$user->isDokter() ||
-            (int) $user->id !== (int) $konsultasi->dokter_tujuan_id ||
-            $konsultasi->status !== Konsultasi::STATUS_SUBMITTED
-        ) {
-            return;
-        }
-
-        $konsultasi->update([
-            'status' => Konsultasi::STATUS_READ,
-        ]);
-
-        $this->audit($konsultasi, 'read', 'Konsultasi telah dibaca dokter tujuan.');
-    }
-
-    private function payloadForSave(Request $request, Kunjungan $kunjungan, RumahSakit $rsTujuan, User $dokterTujuan, bool $submitted): array
-    {
-        $consentReady = $this->consentReady($request->all());
-
-        $status = Konsultasi::STATUS_DRAFT;
-        $consentStatus = 'belum_diminta';
-        $submittedAt = null;
-
-        if ($submitted && $consentReady) {
-            $status = Konsultasi::STATUS_SUBMITTED;
-            $consentStatus = 'disetujui';
-            $submittedAt = now();
-        } elseif ($submitted) {
-            $status = Konsultasi::STATUS_AWAITING_CONSENT;
-            $consentStatus = 'menunggu';
-        } elseif ($consentReady) {
-            $consentStatus = 'disetujui';
-        }
-
-        return [
-            'kunjungan_id' => $kunjungan->id,
-            'pasien_id' => $kunjungan->pasien_id,
-            'rumah_sakit_asal_id' => (int) auth()->user()->rumah_sakit_id,
-            'rumah_sakit_tujuan_id' => $rsTujuan->id,
-            'dokter_pengirim_id' => auth()->id(),
-            'dokter_tujuan_id' => $dokterTujuan->id,
-            'patient_ihs_number' => $kunjungan->pasien?->patient_ihs_number,
-            'organization_ihs_asal' => auth()->user()->rumahSakit?->organization_ihs_number,
-            'organization_ihs_tujuan' => $rsTujuan->organization_ihs_number,
-            'practitioner_ihs_pengirim' => auth()->user()->practitioner_ihs_number,
-            'practitioner_ihs_tujuan' => $dokterTujuan->practitioner_ihs_number,
-            'practitioner_role_pengirim' => auth()->user()->satusehat_practitioner_role_id,
-            'practitioner_role_tujuan' => $dokterTujuan->satusehat_practitioner_role_id,
-            'encounter_satusehat_id' => $kunjungan->satusehat_encounter_id,
-            'judul' => $request->judul,
-            'urgensi' => $request->urgensi,
-            'alasan_konsultasi' => $request->alasan_konsultasi,
-            'pertanyaan_klinis' => $request->pertanyaan_klinis,
-            'ringkasan_klinis' => $request->ringkasan_klinis,
-            'diagnosis_kerja' => $request->diagnosis_kerja,
-            'hasil_penunjang' => $request->hasil_penunjang,
-            'terapi_berjalan' => $request->terapi_berjalan,
-            'consent_status' => $consentStatus,
-            'consent_granted_by_name' => $request->consent_granted_by_name,
-            'consent_granted_by_role' => $request->consent_granted_by_role,
-            'consent_method' => $request->consent_method,
-            'consent_granted_at' => $request->consent_granted_at,
-            'consent_expires_at' => $request->consent_expires_at,
-            'consent_notes' => $request->consent_notes,
-            'status' => $status,
-            'submitted_at' => $submittedAt,
-        ];
-    }
-
     public function index(Request $request)
     {
-        $this->ensureClinicalDoctor();
+        $this->ensureConsultationAccess();
 
         $user = auth()->user();
+        $statuses = Konsultasi::statusLabels();
 
-        $q = Konsultasi::query()
+        $query = Konsultasi::query()
             ->visibleTo($user)
             ->with([
                 'kunjungan.pasien',
@@ -246,24 +32,17 @@ class KonsultasiController extends Controller
                 'rsTujuan',
                 'dokterPengirim',
                 'dokterTujuan',
-                'rujukan',
-            ])
-            ->withCount([
-                'pesan as unread_messages_count' => fn ($query) => $query
-                    ->whereNull('dibaca_at')
-                    ->where('pengirim_id', '!=', $user->id),
+                'latestMessage.pengirim',
             ]);
 
-        if ($keyword = trim((string) $request->input('keyword', ''))) {
-            $q->where(function ($w) use ($keyword) {
-                $w->where('no_konsultasi', 'like', "%{$keyword}%")
-                    ->orWhere('judul', 'like', "%{$keyword}%")
+        if ($keyword = trim($request->input('keyword', ''))) {
+            $query->where(function ($inner) use ($keyword) {
+                $inner->where('judul', 'like', "%{$keyword}%")
                     ->orWhere('alasan_konsultasi', 'like', "%{$keyword}%")
-                    ->orWhere('pertanyaan_klinis', 'like', "%{$keyword}%")
-                    ->orWhereHas('kunjungan', function ($wk) use ($keyword) {
-                        $wk->where('no_rawat', 'like', "%{$keyword}%")
-                            ->orWhereHas('pasien', function ($wp) use ($keyword) {
-                                $wp->where('no_rkm_medis', 'like', "%{$keyword}%")
+                    ->orWhereHas('kunjungan', function ($kunjungan) use ($keyword) {
+                        $kunjungan->where('no_rawat', 'like', "%{$keyword}%")
+                            ->orWhereHas('pasien', function ($pasien) use ($keyword) {
+                                $pasien->where('no_rkm_medis', 'like', "%{$keyword}%")
                                     ->orWhere('nama', 'like', "%{$keyword}%");
                             });
                     });
@@ -271,472 +50,606 @@ class KonsultasiController extends Controller
         }
 
         if ($status = $request->input('status')) {
-            $q->where('status', $status);
+            if (array_key_exists($status, $statuses)) {
+                $query->where('status', $status);
+            }
         }
 
-        if ($urgensi = $request->input('urgensi')) {
-            $q->where('urgensi', $urgensi);
+        if ($request->filled('arah')) {
+            if ($request->input('arah') === 'masuk') {
+                $query->where('dokter_tujuan_id', $user->id);
+            }
+
+            if ($request->input('arah') === 'keluar') {
+                $query->where('dokter_pengirim_id', $user->id);
+            }
         }
 
-        if ($request->boolean('tujuan_saya')) {
-            $q->where('dokter_tujuan_id', auth()->id());
+        $perPage = (int) $request->input('per_page', 10);
+        if (!in_array($perPage, [10, 25, 50], true)) {
+            $perPage = 10;
         }
 
-        $konsultasi = $q->latest()->paginate(10)->withQueryString();
+        $konsultasi = $query->latest()->paginate($perPage)->withQueryString();
 
-        return view('konsultasi.index', compact('konsultasi'));
+        return view('konsultasi.index', compact('konsultasi', 'statuses'));
     }
 
     public function create(Request $request)
     {
-        $this->ensureClinicalDoctor();
+        $this->ensureConsultationAccess();
 
         $user = auth()->user();
         $rsAsalId = (int) $user->rumah_sakit_id;
+        $selectedKunjungan = null;
+
+        if ($request->filled('kunjungan_id')) {
+            $selectedKunjungan = Kunjungan::with(['pasien', 'dokter', 'soap.user'])->findOrFail($request->integer('kunjungan_id'));
+            $this->assertKunjunganCanBeConsulted($selectedKunjungan);
+        }
 
         $kunjungan = Kunjungan::with(['pasien', 'dokter'])
-            ->when(!$user->isAdmin(), fn ($query) => $query->where('rumah_sakit_id', $rsAsalId))
+            ->where('rumah_sakit_id', $rsAsalId)
             ->orderByDesc('tanggal_kunjungan')
+            ->orderByDesc('id')
             ->get();
 
         $rumahSakitTujuan = RumahSakit::where('id', '!=', $rsAsalId)->orderBy('nama')->get();
         $dokterTujuan = collect();
-        $selectedKunjunganId = $request->integer('kunjungan_id') ?: null;
+        if (old('rumah_sakit_tujuan_id')) {
+            $dokterTujuan = User::where('role', 'dokter')
+                ->where('rumah_sakit_id', old('rumah_sakit_tujuan_id'))
+                ->orderBy('name')
+                ->get(['id', 'name']);
+        }
 
-        return view('konsultasi.create', compact('kunjungan', 'rumahSakitTujuan', 'dokterTujuan', 'selectedKunjunganId'));
+        $latestSoap = $selectedKunjungan?->soap->sortByDesc('created_at')->first();
+
+        return view('konsultasi.create', [
+            'kunjungan' => $kunjungan,
+            'rumahSakitTujuan' => $rumahSakitTujuan,
+            'dokterTujuan' => $dokterTujuan,
+            'selectedKunjungan' => $selectedKunjungan,
+            'latestSoap' => $latestSoap,
+            'consentOptions' => $this->consentOptions(),
+            'consentMethods' => $this->consentMethods(),
+            'formAction' => route('konsultasi.store'),
+            'submitLabel' => 'Simpan Konsultasi',
+            'isEdit' => false,
+        ]);
     }
 
     public function store(Request $request)
     {
-        $this->ensureClinicalDoctor();
+        $this->ensureConsultationAccess();
 
-        $request->validate([
-            'kunjungan_id' => ['required', Rule::exists(Kunjungan::class, 'id')],
-            'rumah_sakit_tujuan_id' => ['required', Rule::exists(RumahSakit::class, 'id')],
-            'dokter_tujuan_id' => [
-                'required',
-                Rule::exists(User::class, 'id')->where(function ($query) use ($request) {
-                    $query->where('role', 'dokter')
-                        ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
-                }),
-            ],
-            'judul' => ['required', 'string', 'max:255'],
-            'urgensi' => ['required', 'in:rutin,segera,gawat'],
-            'alasan_konsultasi' => ['required', 'string'],
-            'pertanyaan_klinis' => ['required', 'string'],
-            'ringkasan_klinis' => ['nullable', 'string'],
-            'diagnosis_kerja' => ['nullable', 'string'],
-            'hasil_penunjang' => ['nullable', 'string'],
-            'terapi_berjalan' => ['nullable', 'string'],
-            'consent_granted_by_name' => ['nullable', 'string', 'max:255'],
-            'consent_granted_by_role' => ['nullable', 'string', 'max:100'],
-            'consent_method' => ['nullable', 'string', 'max:100'],
-            'consent_granted_at' => ['nullable', 'date'],
-            'consent_expires_at' => ['nullable', 'date', 'after_or_equal:consent_granted_at'],
-            'consent_notes' => ['nullable', 'string'],
-            'action' => ['required', 'in:draft,submit'],
-        ]);
+        $isSubmit = $request->input('submit_action') === 'submit';
+        $payload = $this->validatedPayload($request, $isSubmit);
+        $kunjungan = Kunjungan::with(['pasien', 'soap'])->findOrFail($payload['kunjungan_id']);
+        $this->assertKunjunganCanBeConsulted($kunjungan);
 
-        $kunjungan = Kunjungan::with(['pasien', 'dokter'])->findOrFail($request->kunjungan_id);
-        $rsTujuan = RumahSakit::findOrFail($request->rumah_sakit_tujuan_id);
-        $dokterTujuan = User::findOrFail($request->dokter_tujuan_id);
+        $consultation = DB::transaction(function () use ($payload, $kunjungan, $isSubmit) {
+            $consultation = Konsultasi::create([
+                'kunjungan_id' => $kunjungan->id,
+                'rumah_sakit_asal_id' => $kunjungan->rumah_sakit_id,
+                'rumah_sakit_tujuan_id' => $payload['rumah_sakit_tujuan_id'],
+                'dokter_pengirim_id' => auth()->id(),
+                'dokter_tujuan_id' => $payload['dokter_tujuan_id'],
+                'judul' => $payload['judul'],
+                'ringkasan_klinis' => $payload['ringkasan_klinis'] ?? null,
+                'diagnosis_kerja' => $payload['diagnosis_kerja'] ?? null,
+                'terapi_berjalan' => $payload['terapi_berjalan'] ?? null,
+                'hasil_penunjang' => $payload['hasil_penunjang'] ?? null,
+                'alasan_konsultasi' => $payload['alasan_konsultasi'],
+                'pertanyaan_konsultasi' => $payload['pertanyaan_konsultasi'] ?? null,
+                'consent_status' => $payload['consent_status'],
+                'consent_nama_pemberi' => $payload['consent_nama_pemberi'] ?? null,
+                'consent_hubungan' => $payload['consent_hubungan'] ?? null,
+                'consent_metode' => $payload['consent_metode'] ?? null,
+                'consent_diberikan_pada' => $payload['consent_diberikan_pada'] ?? null,
+                'consent_catatan' => $payload['consent_catatan'] ?? null,
+                'status' => $isSubmit ? Konsultasi::STATUS_TERKIRIM : Konsultasi::STATUS_DRAFT,
+                'submitted_at' => $isSubmit ? now() : null,
+            ]);
 
-        abort_unless((int) $rsTujuan->id !== (int) auth()->user()->rumah_sakit_id, 422);
+            $this->audit($consultation, 'dibuat', [
+                'status' => $consultation->status,
+                'dokter_tujuan_id' => $consultation->dokter_tujuan_id,
+            ]);
 
-        if (!auth()->user()->isAdmin()) {
-            abort_unless((int) $kunjungan->rumah_sakit_id === (int) auth()->user()->rumah_sakit_id, 403);
-        }
+            if ($isSubmit) {
+                $this->audit($consultation, 'dikirim', [
+                    'consent_status' => $consultation->consent_status,
+                ]);
+            }
 
-        $konsultasi = Konsultasi::create(array_merge(
-            ['no_konsultasi' => $this->generateNoKonsultasi()],
-            $this->payloadForSave($request, $kunjungan, $rsTujuan, $dokterTujuan, $request->action === 'submit')
-        ));
+            return $consultation;
+        });
 
-        KonsultasiPesan::create([
-            'konsultasi_id' => $konsultasi->id,
-            'pengirim_id' => auth()->id(),
-            'jenis_pesan' => 'question',
-            'isi_pesan' => trim(implode("\n\n", array_filter([
-                'Pertanyaan klinis: ' . $request->pertanyaan_klinis,
-                $request->ringkasan_klinis ? 'Ringkasan klinis: ' . $request->ringkasan_klinis : null,
-                $request->diagnosis_kerja ? 'Diagnosis kerja: ' . $request->diagnosis_kerja : null,
-            ]))),
-            'status' => 'sent',
-        ]);
-
-        $konsultasi->update(['last_message_at' => now()]);
-
-        $this->audit($konsultasi, 'created', 'Konsultasi dibuat.', [
-            'status' => $konsultasi->status,
-            'target_doctor_id' => $dokterTujuan->id,
-            'target_rs_id' => $rsTujuan->id,
-        ]);
-
-        if ($konsultasi->status === Konsultasi::STATUS_SUBMITTED) {
-            $this->audit($konsultasi, 'submitted', 'Konsultasi dikirim ke dokter tujuan.');
-            $this->notifyUsers(
-                [$dokterTujuan->id],
-                $konsultasi,
-                'Konsultasi baru masuk',
-                'Konsultasi ' . $konsultasi->no_konsultasi . ' dari dr. ' . auth()->user()->name . ' menunggu tindak lanjut Anda.',
-                'new_consultation'
+        if ($isSubmit) {
+            $this->notifyUser(
+                $consultation->dokterTujuan,
+                $consultation,
+                'konsultasi_baru'
             );
         }
 
-        return redirect()->route('konsultasi.show', $konsultasi)
-            ->with('success', $konsultasi->status === Konsultasi::STATUS_SUBMITTED
-                ? 'Konsultasi berhasil dibuat dan dikirim.'
-                : 'Konsultasi berhasil disimpan.');
+        return redirect()
+            ->route('konsultasi.show', $consultation)
+            ->with('success', $isSubmit ? 'Konsultasi berhasil dikirim.' : 'Draft konsultasi berhasil disimpan.');
     }
 
     public function show(Konsultasi $konsultasi)
     {
+        $this->ensureConsultationAccess();
         $this->assertViewable($konsultasi);
-
-        $this->markConsultationAsRead($konsultasi);
-        $konsultasi->refresh();
 
         $konsultasi->load([
             'kunjungan.pasien',
+            'kunjungan.dokter',
+            'kunjungan.soap.user',
+            'kunjungan.berkasMedis.uploader',
             'rsAsal',
             'rsTujuan',
             'dokterPengirim',
             'dokterTujuan',
             'rujukan',
             'pesan.pengirim',
-            'auditLogs.actor',
+            'auditLogs.user',
         ]);
 
-        KonsultasiPesan::where('konsultasi_id', $konsultasi->id)
-            ->where('pengirim_id', '!=', auth()->id())
-            ->whereNull('dibaca_at')
-            ->update([
-                'dibaca_at' => now(),
-                'status' => 'read',
-                'updated_at' => now(),
+        if ($konsultasi->isTarget(auth()->user())
+            && $konsultasi->status === Konsultasi::STATUS_TERKIRIM
+            && $konsultasi->consent_status === Konsultasi::CONSENT_DIBERIKAN) {
+            $konsultasi->markAsRead();
+            $this->audit($konsultasi, 'dibaca');
+            $konsultasi->refresh();
+            $konsultasi->load([
+                'kunjungan.pasien',
+                'kunjungan.dokter',
+                'kunjungan.soap.user',
+                'kunjungan.berkasMedis.uploader',
+                'rsAsal',
+                'rsTujuan',
+                'dokterPengirim',
+                'dokterTujuan',
+                'rujukan',
+                'pesan.pengirim',
+                'auditLogs.user',
             ]);
+        }
 
-        $this->markRelatedNotificationsAsRead($konsultasi);
-        $this->audit($konsultasi, 'viewed', 'Detail konsultasi dibuka.');
+        $this->markRelatedNotificationsAsRead($konsultasi, auth()->user());
 
-        return view('konsultasi.show', compact('konsultasi'));
+        $latestSoap = $konsultasi->kunjungan->soap->sortByDesc('created_at')->first();
+        $replyTypes = auth()->user()->id === $konsultasi->dokter_tujuan_id
+            ? KonsultasiPesan::typeLabels()
+            : ['pesan' => KonsultasiPesan::typeLabels()['pesan']];
+
+        return view('konsultasi.show', compact('konsultasi', 'latestSoap', 'replyTypes'));
     }
 
     public function edit(Konsultasi $konsultasi)
     {
-        $this->assertSourceAccess($konsultasi);
-
-        abort_unless(in_array($konsultasi->status, Konsultasi::sourceEditableStatuses(), true), 403);
+        $this->ensureConsultationAccess();
+        $this->assertEditable($konsultasi);
 
         $user = auth()->user();
         $rsAsalId = (int) $user->rumah_sakit_id;
+        $konsultasi->load(['kunjungan.pasien', 'kunjungan.dokter', 'kunjungan.soap.user']);
 
         $kunjungan = Kunjungan::with(['pasien', 'dokter'])
-            ->when(!$user->isAdmin(), fn ($query) => $query->where('rumah_sakit_id', $rsAsalId))
+            ->where('rumah_sakit_id', $rsAsalId)
             ->orderByDesc('tanggal_kunjungan')
+            ->orderByDesc('id')
             ->get();
 
         $rumahSakitTujuan = RumahSakit::where('id', '!=', $rsAsalId)->orderBy('nama')->get();
         $dokterTujuan = User::where('role', 'dokter')
-            ->where('rumah_sakit_id', $konsultasi->rumah_sakit_tujuan_id)
+            ->where('rumah_sakit_id', old('rumah_sakit_tujuan_id', $konsultasi->rumah_sakit_tujuan_id))
             ->orderBy('name')
-            ->get();
+            ->get(['id', 'name']);
 
-        return view('konsultasi.edit', compact('konsultasi', 'kunjungan', 'rumahSakitTujuan', 'dokterTujuan'));
+        $latestSoap = $konsultasi->kunjungan->soap->sortByDesc('created_at')->first();
+
+        return view('konsultasi.edit', [
+            'konsultasi' => $konsultasi,
+            'kunjungan' => $kunjungan,
+            'rumahSakitTujuan' => $rumahSakitTujuan,
+            'dokterTujuan' => $dokterTujuan,
+            'selectedKunjungan' => $konsultasi->kunjungan,
+            'latestSoap' => $latestSoap,
+            'consentOptions' => $this->consentOptions(),
+            'consentMethods' => $this->consentMethods(),
+            'formAction' => route('konsultasi.update', $konsultasi),
+            'submitLabel' => 'Perbarui Konsultasi',
+            'isEdit' => true,
+        ]);
     }
 
     public function update(Request $request, Konsultasi $konsultasi)
     {
-        $this->assertSourceAccess($konsultasi);
+        $this->ensureConsultationAccess();
+        $this->assertEditable($konsultasi);
 
-        abort_unless(in_array($konsultasi->status, Konsultasi::sourceEditableStatuses(), true), 403);
+        $isSubmit = $request->input('submit_action') === 'submit';
+        $payload = $this->validatedPayload($request, $isSubmit);
+        $kunjungan = Kunjungan::findOrFail($payload['kunjungan_id']);
+        $this->assertKunjunganCanBeConsulted($kunjungan);
 
-        $request->validate([
-            'kunjungan_id' => ['required', Rule::exists(Kunjungan::class, 'id')],
-            'rumah_sakit_tujuan_id' => ['required', Rule::exists(RumahSakit::class, 'id')],
-            'dokter_tujuan_id' => [
-                'required',
-                Rule::exists(User::class, 'id')->where(function ($query) use ($request) {
-                    $query->where('role', 'dokter')
-                        ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
-                }),
-            ],
-            'judul' => ['required', 'string', 'max:255'],
-            'urgensi' => ['required', 'in:rutin,segera,gawat'],
-            'alasan_konsultasi' => ['required', 'string'],
-            'pertanyaan_klinis' => ['required', 'string'],
-            'ringkasan_klinis' => ['nullable', 'string'],
-            'diagnosis_kerja' => ['nullable', 'string'],
-            'hasil_penunjang' => ['nullable', 'string'],
-            'terapi_berjalan' => ['nullable', 'string'],
-            'consent_granted_by_name' => ['nullable', 'string', 'max:255'],
-            'consent_granted_by_role' => ['nullable', 'string', 'max:100'],
-            'consent_method' => ['nullable', 'string', 'max:100'],
-            'consent_granted_at' => ['nullable', 'date'],
-            'consent_expires_at' => ['nullable', 'date', 'after_or_equal:consent_granted_at'],
-            'consent_notes' => ['nullable', 'string'],
-            'action' => ['required', 'in:draft,submit'],
-        ]);
+        $shouldNotifyTarget = false;
 
-        $kunjungan = Kunjungan::with(['pasien', 'dokter'])->findOrFail($request->kunjungan_id);
-        $rsTujuan = RumahSakit::findOrFail($request->rumah_sakit_tujuan_id);
-        $dokterTujuan = User::findOrFail($request->dokter_tujuan_id);
+        DB::transaction(function () use ($konsultasi, $payload, $kunjungan, $isSubmit, &$shouldNotifyTarget) {
+            $status = $konsultasi->status;
+            $submittedAt = $konsultasi->submitted_at;
 
-        abort_unless((int) $rsTujuan->id !== (int) auth()->user()->rumah_sakit_id, 422);
+            if ($isSubmit) {
+                $shouldNotifyTarget = $status === Konsultasi::STATUS_DRAFT;
+                $status = Konsultasi::STATUS_TERKIRIM;
+                $submittedAt = $submittedAt ?? now();
+            }
 
-        if (!auth()->user()->isAdmin()) {
-            abort_unless((int) $kunjungan->rumah_sakit_id === (int) auth()->user()->rumah_sakit_id, 403);
-        }
-
-        $oldStatus = $konsultasi->status;
-        $oldTargetDoctorId = (int) $konsultasi->dokter_tujuan_id;
-
-        $payload = $this->payloadForSave($request, $kunjungan, $rsTujuan, $dokterTujuan, $request->action === 'submit');
-        if ($konsultasi->submitted_at && $payload['status'] === Konsultasi::STATUS_SUBMITTED) {
-            $payload['submitted_at'] = $konsultasi->submitted_at;
-        }
-
-        $konsultasi->update($payload);
-
-        $this->audit($konsultasi, 'updated', 'Konsultasi diperbarui.', [
-            'status' => $konsultasi->status,
-        ]);
-
-        if (
-            $konsultasi->status === Konsultasi::STATUS_SUBMITTED &&
-            ($oldStatus !== Konsultasi::STATUS_SUBMITTED || $oldTargetDoctorId !== (int) $dokterTujuan->id)
-        ) {
-            $this->notifyUsers(
-                [$dokterTujuan->id],
-                $konsultasi,
-                'Konsultasi perlu ditinjau',
-                'Konsultasi ' . $konsultasi->no_konsultasi . ' telah dikirim atau dialihkan kepada Anda.',
-                'consultation_submitted'
-            );
-        }
-
-        return redirect()->route('konsultasi.show', $konsultasi)->with('success', 'Konsultasi berhasil diperbarui.');
-    }
-
-    public function submit(Konsultasi $konsultasi)
-    {
-        $this->assertSourceAccess($konsultasi);
-
-        abort_unless(in_array($konsultasi->status, [
-            Konsultasi::STATUS_DRAFT,
-            Konsultasi::STATUS_AWAITING_CONSENT,
-        ], true), 403);
-
-        abort_unless(
-            $konsultasi->consent_status === 'disetujui' &&
-            filled($konsultasi->consent_granted_by_name) &&
-            filled($konsultasi->consent_granted_by_role) &&
-            filled($konsultasi->consent_method) &&
-            filled($konsultasi->consent_granted_at),
-            422
-        );
-
-        $konsultasi->update([
-            'status' => Konsultasi::STATUS_SUBMITTED,
-            'submitted_at' => $konsultasi->submitted_at ?: now(),
-        ]);
-
-        $this->audit($konsultasi, 'submitted', 'Konsultasi dikirim dari draft/menunggu consent.');
-        $this->notifyUsers(
-            [$konsultasi->dokter_tujuan_id],
-            $konsultasi,
-            'Konsultasi baru masuk',
-            'Konsultasi ' . $konsultasi->no_konsultasi . ' dari dr. ' . auth()->user()->name . ' menunggu tindak lanjut Anda.',
-            'new_consultation'
-        );
-
-        return back()->with('success', 'Konsultasi berhasil dikirim.');
-    }
-
-    public function ubahStatus(Konsultasi $konsultasi, string $status)
-    {
-        $this->assertTargetDoctorAccess($konsultasi);
-
-        abort_unless(in_array($status, [
-            Konsultasi::STATUS_ACCEPTED,
-            Konsultasi::STATUS_REJECTED,
-        ], true), 404);
-        abort_unless(in_array($konsultasi->status, [
-            Konsultasi::STATUS_SUBMITTED,
-            Konsultasi::STATUS_READ,
-        ], true), 403);
-
-        if ($status === Konsultasi::STATUS_ACCEPTED) {
             $konsultasi->update([
-                'status' => Konsultasi::STATUS_ACCEPTED,
-                'accepted_at' => $konsultasi->accepted_at ?: now(),
+                'kunjungan_id' => $kunjungan->id,
+                'rumah_sakit_asal_id' => $kunjungan->rumah_sakit_id,
+                'rumah_sakit_tujuan_id' => $payload['rumah_sakit_tujuan_id'],
+                'dokter_tujuan_id' => $payload['dokter_tujuan_id'],
+                'judul' => $payload['judul'],
+                'ringkasan_klinis' => $payload['ringkasan_klinis'] ?? null,
+                'diagnosis_kerja' => $payload['diagnosis_kerja'] ?? null,
+                'terapi_berjalan' => $payload['terapi_berjalan'] ?? null,
+                'hasil_penunjang' => $payload['hasil_penunjang'] ?? null,
+                'alasan_konsultasi' => $payload['alasan_konsultasi'],
+                'pertanyaan_konsultasi' => $payload['pertanyaan_konsultasi'] ?? null,
+                'consent_status' => $payload['consent_status'],
+                'consent_nama_pemberi' => $payload['consent_nama_pemberi'] ?? null,
+                'consent_hubungan' => $payload['consent_hubungan'] ?? null,
+                'consent_metode' => $payload['consent_metode'] ?? null,
+                'consent_diberikan_pada' => $payload['consent_diberikan_pada'] ?? null,
+                'consent_catatan' => $payload['consent_catatan'] ?? null,
+                'status' => $status,
+                'submitted_at' => $submittedAt,
             ]);
-            $this->audit($konsultasi, 'accepted', 'Konsultasi diterima dokter tujuan.');
-            $this->notifyUsers(
-                [$konsultasi->dokter_pengirim_id],
+
+            $this->audit($konsultasi, 'diperbarui', [
+                'status' => $konsultasi->status,
+                'dokter_tujuan_id' => $konsultasi->dokter_tujuan_id,
+            ]);
+
+            if ($isSubmit && $konsultasi->status === Konsultasi::STATUS_TERKIRIM) {
+                $this->audit($konsultasi, 'dikirim', [
+                    'consent_status' => $konsultasi->consent_status,
+                ]);
+            }
+        });
+
+        if ($shouldNotifyTarget) {
+            $konsultasi->refresh();
+            $this->notifyUser(
+                $konsultasi->dokterTujuan,
                 $konsultasi,
-                'Konsultasi diterima',
-                'Konsultasi ' . $konsultasi->no_konsultasi . ' telah diterima oleh dr. ' . auth()->user()->name . '.',
-                'consultation_accepted'
+                'konsultasi_baru'
             );
-
-            return back()->with('success', 'Konsultasi diterima.');
         }
 
-        $konsultasi->update(['status' => Konsultasi::STATUS_REJECTED]);
-        $this->audit($konsultasi, 'rejected', 'Konsultasi ditolak dokter tujuan.');
-        $this->notifyUsers(
-            [$konsultasi->dokter_pengirim_id],
-            $konsultasi,
-            'Konsultasi ditolak',
-            'Konsultasi ' . $konsultasi->no_konsultasi . ' ditolak oleh dr. ' . auth()->user()->name . '.',
-            'consultation_rejected'
-        );
-
-        return back()->with('success', 'Konsultasi ditolak.');
+        return redirect()
+            ->route('konsultasi.show', $konsultasi)
+            ->with('success', $isSubmit ? 'Konsultasi berhasil diperbarui dan dikirim.' : 'Draft konsultasi berhasil diperbarui.');
     }
 
-    public function balas(Request $request, Konsultasi $konsultasi)
+    public function destroy(Konsultasi $konsultasi)
     {
-        $this->assertParticipant($konsultasi);
+        $this->ensureConsultationAccess();
+        $this->assertEditable($konsultasi);
 
-        abort_unless(!$konsultasi->isTerminal(), 403);
-        abort_unless($konsultasi->isReplyable(), 403);
+        DB::transaction(function () use ($konsultasi) {
+            $konsultasi->pesan()->delete();
+            $konsultasi->auditLogs()->delete();
+            $konsultasi->delete();
+        });
 
-        $isTargetDoctor = (int) auth()->id() === (int) $konsultasi->dokter_tujuan_id;
-        $allowedTypes = $isTargetDoctor
-            ? ['message', 'answer', 'request_more_info']
-            : ['message'];
-
-        $request->validate([
-            'jenis_pesan' => ['required', Rule::in($allowedTypes)],
-            'isi_pesan' => ['required', 'string'],
-        ]);
-
-        $jenis = $request->jenis_pesan;
-
-        KonsultasiPesan::create([
-            'konsultasi_id' => $konsultasi->id,
-            'pengirim_id' => auth()->id(),
-            'jenis_pesan' => $jenis,
-            'isi_pesan' => $request->isi_pesan,
-            'status' => 'sent',
-        ]);
-
-        $newStatus = $konsultasi->status;
-        if ($isTargetDoctor && $jenis === 'request_more_info') {
-            $newStatus = Konsultasi::STATUS_AWAITING_MORE_INFO;
-        } elseif ($isTargetDoctor && $jenis === 'answer') {
-            $newStatus = Konsultasi::STATUS_ANSWERED;
-        } elseif ($isTargetDoctor) {
-            $newStatus = Konsultasi::STATUS_IN_DISCUSSION;
-        } elseif ($jenis === 'message') {
-            $newStatus = Konsultasi::STATUS_IN_DISCUSSION;
-        }
-
-        $updates = [
-            'status' => $newStatus,
-            'last_message_at' => now(),
-        ];
-
-        if ($newStatus === Konsultasi::STATUS_ANSWERED) {
-            $updates['answered_at'] = now();
-        }
-
-        $konsultasi->update($updates);
-
-        $recipientId = $isTargetDoctor ? $konsultasi->dokter_pengirim_id : $konsultasi->dokter_tujuan_id;
-        $notificationTitle = 'Pesan baru pada konsultasi';
-        $notificationMessage = 'dr. ' . auth()->user()->name . ' mengirim pesan baru pada konsultasi ' . $konsultasi->no_konsultasi . '.';
-
-        if ($jenis === 'answer') {
-            $notificationTitle = 'Jawaban konsultasi masuk';
-            $notificationMessage = 'dr. ' . auth()->user()->name . ' mengirim jawaban klinis untuk konsultasi ' . $konsultasi->no_konsultasi . '.';
-        } elseif ($jenis === 'request_more_info') {
-            $notificationTitle = 'Konsultasi butuh info tambahan';
-            $notificationMessage = 'dr. ' . auth()->user()->name . ' meminta info tambahan untuk konsultasi ' . $konsultasi->no_konsultasi . '.';
-        }
-
-        $this->notifyUsers(
-            [$recipientId],
-            $konsultasi,
-            $notificationTitle,
-            $notificationMessage,
-            'consultation_reply'
-        );
-
-        $this->audit($konsultasi, 'message_sent', 'Pesan konsultasi ditambahkan.', [
-            'jenis_pesan' => $jenis,
-            'status_baru' => $newStatus,
-        ]);
-
-        return back()->with('success', 'Pesan konsultasi berhasil dikirim.');
+        return redirect()->route('konsultasi.index')->with('success', 'Draft konsultasi berhasil dihapus.');
     }
 
-    public function tutup(Konsultasi $konsultasi)
+    public function accept(Konsultasi $konsultasi)
     {
-        $this->assertParticipant($konsultasi);
+        $this->ensureConsultationAccess();
+        $this->assertTargetActor($konsultasi);
 
-        abort_unless(!$konsultasi->isTerminal(), 403);
-        abort_unless(!in_array($konsultasi->status, [
-            Konsultasi::STATUS_DRAFT,
-            Konsultasi::STATUS_AWAITING_CONSENT,
-        ], true), 403);
+        abort_unless(in_array($konsultasi->status, [
+            Konsultasi::STATUS_TERKIRIM,
+            Konsultasi::STATUS_DIBACA,
+        ], true), 422);
 
         $konsultasi->update([
-            'status' => Konsultasi::STATUS_CLOSED,
-            'closed_at' => now(),
+            'status' => Konsultasi::STATUS_DITERIMA,
+            'accepted_at' => now(),
+            'read_at' => $konsultasi->read_at ?? now(),
         ]);
 
-        $this->audit($konsultasi, 'closed', 'Konsultasi ditutup.');
+        $this->audit($konsultasi, 'diterima');
+
+        return back()->with('success', 'Konsultasi sudah Anda terima.');
+    }
+
+    public function reply(Request $request, Konsultasi $konsultasi)
+    {
+        $this->ensureConsultationAccess();
+        $this->assertViewable($konsultasi);
+        abort_unless($konsultasi->canReply(), 422, 'Konsultasi ini sudah tidak dapat dibalas.');
+
+        $allowedTypes = auth()->id() === (int) $konsultasi->dokter_tujuan_id
+            ? array_keys(KonsultasiPesan::typeLabels())
+            : ['pesan'];
+
+        $payload = $request->validate([
+            'tipe' => ['required', Rule::in($allowedTypes)],
+            'pesan' => ['required', 'string'],
+        ]);
+
+        $recipient = null;
+
+        DB::transaction(function () use ($konsultasi, $payload, &$recipient) {
+            $message = $konsultasi->pesan()->create([
+                'pengirim_id' => auth()->id(),
+                'tipe' => $payload['tipe'],
+                'pesan' => $payload['pesan'],
+            ]);
+
+            $newStatus = Konsultasi::STATUS_DISKUSI;
+            if ($konsultasi->isTarget(auth()->user())) {
+                $newStatus = match ($payload['tipe']) {
+                    'jawaban' => Konsultasi::STATUS_DIJAWAB,
+                    'minta_info' => Konsultasi::STATUS_BUTUH_INFO,
+                    default => Konsultasi::STATUS_DISKUSI,
+                };
+            }
+
+            $konsultasi->update([
+                'status' => $newStatus,
+                'read_at' => $konsultasi->read_at ?? now(),
+            ]);
+
+            $this->audit($konsultasi, 'balas', [
+                'tipe' => $message->tipe,
+                'pesan_id' => $message->id,
+            ]);
+
+            $recipient = $konsultasi->isTarget(auth()->user())
+                ? $konsultasi->dokterPengirim
+                : $konsultasi->dokterTujuan;
+        });
+
+        if ($recipient) {
+            $konsultasi->refresh();
+            $this->notifyUser(
+                $recipient,
+                $konsultasi,
+                'pesan_baru'
+            );
+        }
+
+        return back()->with('success', 'Balasan konsultasi berhasil dikirim.');
+    }
+
+    public function close(Konsultasi $konsultasi)
+    {
+        $this->ensureConsultationAccess();
+        $this->assertViewable($konsultasi);
+
+        abort_unless($konsultasi->status !== Konsultasi::STATUS_DRAFT, 422);
+        abort_unless($konsultasi->status !== Konsultasi::STATUS_DIRUJUK, 422);
+
+        $konsultasi->update([
+            'status' => Konsultasi::STATUS_DITUTUP,
+            'closed_at' => now(),
+            'closed_by' => auth()->id(),
+        ]);
+
+        $this->audit($konsultasi, 'ditutup');
 
         return back()->with('success', 'Konsultasi ditutup.');
     }
 
-    public function eskalasi(Konsultasi $konsultasi)
+    public function escalate(Konsultasi $konsultasi)
     {
-        $this->assertSourceAccess($konsultasi);
+        $this->ensureConsultationAccess();
+        $this->assertSenderActor($konsultasi);
 
-        abort_unless(!$konsultasi->isTerminal(), 403);
-        abort_unless(!$konsultasi->escalated_to_rujukan_id, 422);
-        abort_unless(!in_array($konsultasi->status, [
-            Konsultasi::STATUS_DRAFT,
-            Konsultasi::STATUS_AWAITING_CONSENT,
-        ], true), 403);
+        abort_unless($konsultasi->status !== Konsultasi::STATUS_DRAFT, 422);
+        abort_unless($konsultasi->consent_status === Konsultasi::CONSENT_DIBERIKAN, 422, 'Consent pasien belum lengkap.');
 
-        $alasanRujukan = trim(implode("\n\n", array_filter([
-            'Asal konsultasi: ' . $konsultasi->no_konsultasi,
-            'Judul: ' . $konsultasi->judul,
-            'Alasan konsultasi: ' . $konsultasi->alasan_konsultasi,
-            'Pertanyaan klinis: ' . $konsultasi->pertanyaan_klinis,
-            $konsultasi->diagnosis_kerja ? 'Diagnosis kerja: ' . $konsultasi->diagnosis_kerja : null,
-            $konsultasi->ringkasan_klinis ? 'Ringkasan klinis: ' . $konsultasi->ringkasan_klinis : null,
-            $konsultasi->terapi_berjalan ? 'Terapi berjalan: ' . $konsultasi->terapi_berjalan : null,
-        ])));
+        if ($konsultasi->rujukan_id) {
+            return redirect()->route('rujukan.show', $konsultasi->rujukan_id)
+                ->with('info', 'Konsultasi ini sudah pernah dijadikan rujukan resmi.');
+        }
 
-        $rujukan = Rujukan::create([
-            'kunjungan_id' => $konsultasi->kunjungan_id,
-            'origin_konsultasi_id' => $konsultasi->id,
-            'rumah_sakit_asal_id' => $konsultasi->rumah_sakit_asal_id,
-            'rumah_sakit_tujuan_id' => $konsultasi->rumah_sakit_tujuan_id,
-            'dokter_tujuan_id' => $konsultasi->dokter_tujuan_id,
-            'alasan' => $konsultasi->judul,
-            'alasan_rujukan' => $alasanRujukan,
-            'catatan' => 'Rujukan resmi hasil eskalasi dari konsultasi klinis lintas rumah sakit.',
-            'status' => 'menunggu',
+        $lastClinicalReply = $konsultasi->pesan()
+            ->whereIn('tipe', ['jawaban', 'minta_info'])
+            ->latest()
+            ->first();
+
+        $rujukan = DB::transaction(function () use ($konsultasi, $lastClinicalReply) {
+            $rujukan = Rujukan::create([
+                'kunjungan_id' => $konsultasi->kunjungan_id,
+                'rumah_sakit_asal_id' => $konsultasi->rumah_sakit_asal_id,
+                'rumah_sakit_tujuan_id' => $konsultasi->rumah_sakit_tujuan_id,
+                'dokter_tujuan_id' => $konsultasi->dokter_tujuan_id,
+                'alasan' => $konsultasi->judul,
+                'alasan_rujukan' => $konsultasi->alasan_konsultasi,
+                'catatan' => trim(implode("\n\n", array_filter([
+                    'Pertanyaan konsultasi: '.$konsultasi->pertanyaan_konsultasi,
+                    'Ringkasan klinis: '.$konsultasi->ringkasan_klinis,
+                    $lastClinicalReply ? 'Tindak lanjut konsultasi: '.$lastClinicalReply->pesan : null,
+                ]))),
+                'status' => 'menunggu',
+            ]);
+
+            $konsultasi->update([
+                'rujukan_id' => $rujukan->id,
+                'status' => Konsultasi::STATUS_DIRUJUK,
+            ]);
+
+            $this->audit($konsultasi, 'dijadikan_rujukan', [
+                'rujukan_id' => $rujukan->id,
+            ]);
+
+            return $rujukan;
+        });
+
+        return redirect()->route('rujukan.show', $rujukan)->with('success', 'Konsultasi berhasil dilanjutkan menjadi rujukan resmi.');
+    }
+
+    private function validatedPayload(Request $request, bool $isSubmit): array
+    {
+        $payload = $request->validate([
+            'kunjungan_id' => ['required', Rule::exists('kunjungan', 'id')],
+            'rumah_sakit_tujuan_id' => ['required', Rule::exists('rumah_sakit', 'id')],
+            'dokter_tujuan_id' => [
+                'required',
+                Rule::exists('users', 'id')->where(function ($query) use ($request) {
+                    $query->where('role', 'dokter')
+                        ->where('rumah_sakit_id', $request->input('rumah_sakit_tujuan_id'));
+                }),
+            ],
+            'judul' => ['required', 'string', 'max:255'],
+            'ringkasan_klinis' => ['nullable', 'string'],
+            'diagnosis_kerja' => ['nullable', 'string'],
+            'terapi_berjalan' => ['nullable', 'string'],
+            'hasil_penunjang' => ['nullable', 'string'],
+            'alasan_konsultasi' => ['required', 'string'],
+            'pertanyaan_konsultasi' => ['nullable', 'string'],
+            'consent_status' => ['required', Rule::in(array_keys($this->consentOptions()))],
+            'consent_nama_pemberi' => ['nullable', 'string', 'max:255'],
+            'consent_hubungan' => ['nullable', 'string', 'max:255'],
+            'consent_metode' => ['nullable', Rule::in(array_keys($this->consentMethods()))],
+            'consent_diberikan_pada' => ['nullable', 'date'],
+            'consent_catatan' => ['nullable', 'string'],
         ]);
 
-        $konsultasi->update([
-            'status' => Konsultasi::STATUS_ESCALATED,
-            'escalated_to_rujukan_id' => $rujukan->id,
-            'closed_at' => now(),
-        ]);
+        $kunjungan = Kunjungan::findOrFail($payload['kunjungan_id']);
+        $this->assertKunjunganCanBeConsulted($kunjungan);
 
-        $this->audit($konsultasi, 'escalated', 'Konsultasi dieskalasi menjadi rujukan resmi.', [
-            'rujukan_id' => $rujukan->id,
-        ]);
+        if ((int) $payload['rumah_sakit_tujuan_id'] === (int) $kunjungan->rumah_sakit_id) {
+            throw ValidationException::withMessages([
+                'rumah_sakit_tujuan_id' => 'Rumah sakit tujuan harus berbeda dari rumah sakit asal.',
+            ]);
+        }
 
-        return redirect()->route('rujukan.show', $rujukan)
-            ->with('success', 'Konsultasi berhasil dilanjutkan menjadi rujukan resmi.');
+        if ($payload['consent_status'] === Konsultasi::CONSENT_DIBERIKAN) {
+            if (
+                !filled($payload['consent_nama_pemberi'] ?? null)
+                || !filled($payload['consent_hubungan'] ?? null)
+                || !filled($payload['consent_metode'] ?? null)
+                || !filled($payload['consent_diberikan_pada'] ?? null)
+            ) {
+                throw ValidationException::withMessages([
+                    'consent_status' => 'Data persetujuan pasien belum lengkap.',
+                ]);
+            }
+        }
+
+        if ($isSubmit) {
+            if ($payload['consent_status'] !== Konsultasi::CONSENT_DIBERIKAN) {
+                throw ValidationException::withMessages([
+                    'consent_status' => 'Consent pasien harus sudah diberikan sebelum konsultasi dikirim.',
+                ]);
+            }
+        }
+
+        return $payload;
+    }
+
+    private function assertKunjunganCanBeConsulted(Kunjungan $kunjungan): void
+    {
+        abort_unless((int) $kunjungan->rumah_sakit_id === (int) auth()->user()->rumah_sakit_id, 403);
+    }
+
+    private function assertViewable(Konsultasi $konsultasi): void
+    {
+        $allowed = Konsultasi::query()
+            ->visibleTo(auth()->user())
+            ->whereKey($konsultasi->id)
+            ->exists();
+
+        abort_unless($allowed, 403);
+    }
+
+    private function assertEditable(Konsultasi $konsultasi): void
+    {
+        abort_unless($konsultasi->isSender(auth()->user()), 403);
+        abort_unless($konsultasi->status === Konsultasi::STATUS_DRAFT, 422);
+    }
+
+    private function assertTargetActor(Konsultasi $konsultasi): void
+    {
+        $this->assertViewable($konsultasi);
+        abort_unless($konsultasi->isTarget(auth()->user()), 403);
+    }
+
+    private function assertSenderActor(Konsultasi $konsultasi): void
+    {
+        $this->assertViewable($konsultasi);
+        abort_unless($konsultasi->isSender(auth()->user()), 403);
+    }
+
+    private function audit(Konsultasi $konsultasi, string $aksi, ?array $payload = null): void
+    {
+        KonsultasiAuditLog::create([
+            'konsultasi_id' => $konsultasi->id,
+            'user_id' => auth()->id(),
+            'aksi' => $aksi,
+            'payload' => $payload,
+        ]);
+    }
+
+    private function ensureConsultationAccess(): void
+    {
+        abort_unless(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdmin()), 403);
+    }
+
+    private function notifyUser(?User $recipient, Konsultasi $konsultasi, string $eventType): void
+    {
+        if (!$recipient || (int) $recipient->id === (int) auth()->id()) {
+            return;
+        }
+
+        $recipient->notify(new KonsultasiActivityNotification(
+            $konsultasi,
+            auth()->user(),
+            $eventType
+        ));
+    }
+
+    private function markRelatedNotificationsAsRead(Konsultasi $konsultasi, User $user): void
+    {
+        $related = $user->unreadNotifications()
+            ->where('type', KonsultasiActivityNotification::class)
+            ->get()
+            ->filter(function ($notification) use ($konsultasi) {
+                return (int) ($notification->data['konsultasi_id'] ?? 0) === (int) $konsultasi->id;
+            });
+
+        if ($related->isNotEmpty()) {
+            $related->markAsRead();
+        }
+    }
+
+    private function consentOptions(): array
+    {
+        return [
+            Konsultasi::CONSENT_MENUNGGU => 'Menunggu',
+            Konsultasi::CONSENT_DIBERIKAN => 'Diberikan',
+            Konsultasi::CONSENT_DITOLAK => 'Ditolak',
+        ];
+    }
+
+    private function consentMethods(): array
+    {
+        return [
+            'lisan' => 'Lisan',
+            'tertulis' => 'Tertulis',
+            'digital' => 'Digital',
+        ];
     }
 }

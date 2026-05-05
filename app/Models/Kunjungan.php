@@ -22,7 +22,7 @@ class Kunjungan extends Model
         'dokter_id',
         'user_id',
         'rumah_sakit_id',
-        'satusehat_encounter_id',
+        'poli',
         'rajalranap',
         'tanggal_kunjungan',
         'waktu_masuk',
@@ -63,14 +63,14 @@ class Kunjungan extends Model
         return $this->hasOne(Rujukan::class);
     }
 
+    public function konsultasi()
+    {
+        return $this->hasMany(Konsultasi::class, 'kunjungan_id');
+    }
+
     public function berkasMedis()
     {
         return $this->hasMany(BerkasMedis::class, 'kunjungan_id')
                     ->orderByDesc('created_at');;
-    }
-
-    public function konsultasi()
-    {
-        return $this->hasMany(Konsultasi::class, 'kunjungan_id');
     }
 }

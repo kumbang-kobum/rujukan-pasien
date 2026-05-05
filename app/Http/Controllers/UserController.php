@@ -41,9 +41,6 @@ class UserController extends Controller
         $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|email|unique:users',
-            'practitioner_ihs_number' => 'nullable|string|max:100|unique:users,practitioner_ihs_number',
-            'satusehat_practitioner_role_id' => 'nullable|string|max:100|unique:users,satusehat_practitioner_role_id',
-            'spesialisasi' => 'nullable|string|max:255',
             'password'        => 'required|string|min:6|confirmed',
             'role'            => 'required|in:admin,dokter,perawat',
             'rumah_sakit_id'  => 'required|exists:rumah_sakit,id',
@@ -52,9 +49,6 @@ class UserController extends Controller
         User::create([
             'name'            => $request->name,
             'email'           => $request->email,
-            'practitioner_ihs_number' => $request->practitioner_ihs_number,
-            'satusehat_practitioner_role_id' => $request->satusehat_practitioner_role_id,
-            'spesialisasi' => $request->spesialisasi,
             'password'        => Hash::make($request->password),
             'role'            => $request->role,
             'rumah_sakit_id'  => $request->rumah_sakit_id,
@@ -74,9 +68,6 @@ class UserController extends Controller
         $request->validate([
             'name'            => 'required|string|max:255',
             'email'           => 'required|email|unique:users,email,'.$user->id,
-            'practitioner_ihs_number' => 'nullable|string|max:100|unique:users,practitioner_ihs_number,'.$user->id,
-            'satusehat_practitioner_role_id' => 'nullable|string|max:100|unique:users,satusehat_practitioner_role_id,'.$user->id,
-            'spesialisasi' => 'nullable|string|max:255',
             'role'            => 'required|in:admin,dokter,perawat',
             'rumah_sakit_id'  => 'required|exists:rumah_sakit,id',
             'password'        => 'nullable|string|min:6|confirmed',
@@ -85,9 +76,6 @@ class UserController extends Controller
         $data = $request->only([
             'name',
             'email',
-            'practitioner_ihs_number',
-            'satusehat_practitioner_role_id',
-            'spesialisasi',
             'role',
             'rumah_sakit_id',
         ]);

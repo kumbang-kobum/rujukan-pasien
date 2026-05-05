@@ -67,7 +67,6 @@ class PasienController extends Controller
     {
         $request->validate([
             'nik'           => 'required|unique:pasien',
-            'patient_ihs_number' => 'nullable|string|max:100|unique:pasien,patient_ihs_number',
             'nama'          => 'required|string|max:255',
             'tempat_lahir'  => 'required|string|max:255',
             'tanggal_lahir' => 'required|date',
@@ -79,7 +78,6 @@ class PasienController extends Controller
         Pasien::create([
             'no_rkm_medis'  => $request->no_rkm_medis,
             'nik'           => $request->nik,
-            'patient_ihs_number' => $request->patient_ihs_number,
             'nama'          => $request->nama,
             'tempat_lahir'  => $request->tempat_lahir, // <<< WAJIB ADA
             'tanggal_lahir' => $request->tanggal_lahir,
@@ -106,7 +104,6 @@ class PasienController extends Controller
     {
         $request->validate([
             'nik'          => 'required|unique:pasien,nik,' . $pasien->id,
-            'patient_ihs_number' => 'nullable|string|max:100|unique:pasien,patient_ihs_number,' . $pasien->id,
             'nama'         => 'required|string|max:255',
             'tanggal_lahir'=> 'required|date',
             'tempat_lahir' => 'required|string|max:255',

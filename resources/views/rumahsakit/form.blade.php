@@ -9,16 +9,6 @@
   </div>
 
   <div class="col-md-6">
-    <label class="form-label">Organization IHS Number</label>
-    <input name="organization_ihs_number"
-           class="form-control @error('organization_ihs_number') is-invalid @enderror"
-           value="{{ old('organization_ihs_number', $rs->organization_ihs_number ?? '') }}"
-           maxlength="100"
-           placeholder="Contoh: 1000004">
-    @error('organization_ihs_number') <div class="invalid-feedback">{{ $message }}</div> @enderror
-  </div>
-
-  <div class="col-md-6">
     <label class="form-label">Telepon</label>
     <input name="telepon"
            class="form-control @error('telepon') is-invalid @enderror"

@@ -1,298 +1,266 @@
 @extends('layouts.app')
-@section('title','Detail Konsultasi')
+@section('title', 'Detail Konsultasi')
 
 @section('content')
 @php
-  $user = auth()->user();
-  $isSource = $user->isAdmin() || ((int) $user->id === (int) $konsultasi->dokter_pengirim_id) || ((int) $user->rumah_sakit_id === (int) $konsultasi->rumah_sakit_asal_id);
-  $isTargetDoctorUser = (int) $user->id === (int) $konsultasi->dokter_tujuan_id;
-  $isTargetDoctor = $user->isAdmin() || $isTargetDoctorUser;
-  $isParticipant = $user->isAdmin() || in_array((int) $user->id, [(int) $konsultasi->dokter_pengirim_id, (int) $konsultasi->dokter_tujuan_id], true);
-  $canEdit = $isSource && in_array($konsultasi->status, \App\Models\Konsultasi::sourceEditableStatuses(), true);
-  $canSubmit = $isSource && in_array($konsultasi->status, ['draft', 'awaiting_consent'], true) && $konsultasi->consent_status === 'disetujui';
-  $canAccept = $isTargetDoctor && in_array($konsultasi->status, ['submitted', 'read'], true);
-  $canReply = $isParticipant && !$konsultasi->isTerminal() && $konsultasi->isReplyable();
-  $canClose = $isParticipant && !$konsultasi->isTerminal() && !in_array($konsultasi->status, ['draft', 'awaiting_consent'], true);
-  $canEscalate = $isSource && !$konsultasi->isTerminal() && !$konsultasi->escalated_to_rujukan_id && !in_array($konsultasi->status, ['draft', 'awaiting_consent'], true);
-  $needsSourceSubmission = $isSource && in_array($konsultasi->status, ['draft', 'awaiting_consent'], true);
+    $statusLabels = \App\Models\Konsultasi::statusLabels();
+    $statusClasses = \App\Models\Konsultasi::statusBadgeClasses();
+    $canReply = $konsultasi->canReply();
+    $isSender = (int) $konsultasi->dokter_pengirim_id === (int) auth()->id();
+    $isTarget = (int) $konsultasi->dokter_tujuan_id === (int) auth()->id();
 @endphp
 
-<div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-  <div>
-    <h4 class="mb-1">Konsultasi {{ $konsultasi->no_konsultasi }}</h4>
-    <div class="text-muted small">Kasus konsultasi klinis lintas rumah sakit.</div>
-  </div>
-  <div class="d-flex gap-2 flex-wrap">
-    <a href="{{ route('konsultasi.index') }}" class="btn btn-secondary">Kembali</a>
-    @if($canEdit)
-      <a href="{{ route('konsultasi.edit', $konsultasi) }}" class="btn btn-warning">Edit</a>
-    @endif
-  </div>
+<div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
+    <div>
+        <h4 class="mb-1">{{ $konsultasi->judul }}</h4>
+        <div class="text-muted">
+            No Rawat {{ $konsultasi->kunjungan->no_rawat ?? '-' }} · Pasien {{ $konsultasi->kunjungan->pasien->nama ?? '-' }}
+        </div>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+        <a href="{{ route('konsultasi.index') }}" class="btn btn-outline-secondary">Kembali</a>
+        @if($isSender && $konsultasi->status === \App\Models\Konsultasi::STATUS_DRAFT)
+            <a href="{{ route('konsultasi.edit', $konsultasi) }}" class="btn btn-warning">Edit Draft</a>
+            <form method="POST" action="{{ route('konsultasi.destroy', $konsultasi) }}" onsubmit="return confirm('Hapus draft konsultasi ini?')" class="d-inline">
+                @csrf
+                @method('DELETE')
+                <button type="submit" class="btn btn-outline-danger">Hapus Draft</button>
+            </form>
+        @endif
+    </div>
 </div>
 
+@if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
+@if(session('info')) <div class="alert alert-info">{{ session('info') }}</div> @endif
+
 <div class="row g-3">
-  <div class="col-lg-8">
-    <div class="card shadow-sm mb-3">
-      <div class="card-header bg-light d-flex justify-content-between align-items-center flex-wrap gap-2">
-        <div class="fw-semibold">{{ $konsultasi->judul }}</div>
-        <div class="d-flex gap-2 flex-wrap">
-          @php
-            $urgencyClass = match($konsultasi->urgensi) {
-              'gawat' => 'danger',
-              'segera' => 'warning text-dark',
-              default => 'secondary',
-            };
-          @endphp
-          <span class="badge bg-{{ $urgencyClass }}">{{ $konsultasi->urgencyLabel() }}</span>
-          <span class="badge bg-{{ $konsultasi->statusBadgeClass() }}">{{ $konsultasi->statusLabel() }}</span>
-        </div>
-      </div>
-      <div class="card-body">
-        <table class="table table-bordered mb-0">
-          <tr>
-            <th width="28%">No Rawat</th>
-            <td>{{ $konsultasi->kunjungan->no_rawat ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Pasien</th>
-            <td>{{ $konsultasi->kunjungan->pasien->no_rkm_medis ?? '-' }} - {{ $konsultasi->kunjungan->pasien->nama ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Identitas SATUSEHAT Pasien</th>
-            <td>{{ $konsultasi->patient_ihs_number ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Rumah Sakit Asal</th>
-            <td>{{ $konsultasi->rsAsal->nama ?? '-' }} <span class="text-muted">({{ $konsultasi->organization_ihs_asal ?? '-' }})</span></td>
-          </tr>
-          <tr>
-            <th>Dokter Pengirim</th>
-            <td>{{ $konsultasi->dokterPengirim->name ?? '-' }} <span class="text-muted">({{ $konsultasi->practitioner_ihs_pengirim ?? '-' }})</span></td>
-          </tr>
-          <tr>
-            <th>Rumah Sakit Tujuan</th>
-            <td>{{ $konsultasi->rsTujuan->nama ?? '-' }} <span class="text-muted">({{ $konsultasi->organization_ihs_tujuan ?? '-' }})</span></td>
-          </tr>
-          <tr>
-            <th>Dokter Tujuan</th>
-            <td>{{ $konsultasi->dokterTujuan->name ?? '-' }} <span class="text-muted">({{ $konsultasi->practitioner_ihs_tujuan ?? '-' }})</span></td>
-          </tr>
-          <tr>
-            <th>Encounter SATUSEHAT</th>
-            <td>{{ $konsultasi->encounter_satusehat_id ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Alasan Konsultasi</th>
-            <td class="multiline">{{ $konsultasi->alasan_konsultasi }}</td>
-          </tr>
-          <tr>
-            <th>Pertanyaan Klinis</th>
-            <td class="multiline">{{ $konsultasi->pertanyaan_klinis }}</td>
-          </tr>
-          <tr>
-            <th>Ringkasan Klinis</th>
-            <td class="multiline">{{ $konsultasi->ringkasan_klinis ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Diagnosis Kerja</th>
-            <td class="multiline">{{ $konsultasi->diagnosis_kerja ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Hasil Penunjang</th>
-            <td class="multiline">{{ $konsultasi->hasil_penunjang ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Terapi Berjalan</th>
-            <td class="multiline">{{ $konsultasi->terapi_berjalan ?: '-' }}</td>
-          </tr>
-        </table>
-      </div>
-    </div>
-
-    <div class="card shadow-sm mb-3">
-      <div class="card-header bg-light fw-semibold">Thread Diskusi</div>
-      <div class="card-body">
-        @if($canAccept && $konsultasi->status === 'submitted')
-          <div class="alert alert-info">
-            Konsultasi ini baru terkirim. Saat dokter tujuan membuka detail, status akan berubah menjadi <strong>Dibaca</strong>.
-          </div>
-        @endif
-        @if($canAccept && $konsultasi->status === 'read')
-          <div class="alert alert-info">
-            Konsultasi ini sudah dibaca. Dokter tujuan bisa langsung membalas, atau klik <strong>Terima Konsultasi</strong> jika ingin memberi ACC eksplisit.
-          </div>
-        @endif
-        @forelse($konsultasi->pesan->sortBy('created_at') as $pesan)
-          <div class="border rounded p-3 mb-3">
-            <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-2">
-              <div>
-                <div class="fw-semibold">{{ $pesan->pengirim->name ?? 'Sistem' }}</div>
-                <div class="small text-muted">{{ $pesan->created_at->format('d/m/Y H:i') }}</div>
-              </div>
-              <div class="d-flex gap-2 flex-wrap">
-                <span class="badge bg-light text-dark border">{{ ucfirst(str_replace('_', ' ', $pesan->jenis_pesan)) }}</span>
-                <span class="badge bg-{{ $pesan->status === 'read' ? 'success' : 'secondary' }}">{{ $pesan->status }}</span>
-              </div>
+    <div class="col-12 col-xl-8">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-info text-white d-flex justify-content-between align-items-center flex-wrap gap-2">
+                <span>Ringkasan Konsultasi</span>
+                <span class="badge {{ $statusClasses[$konsultasi->status] ?? 'bg-secondary' }}">
+                    {{ $statusLabels[$konsultasi->status] ?? ucfirst($konsultasi->status) }}
+                </span>
             </div>
-            <div class="multiline">{{ $pesan->isi_pesan }}</div>
-          </div>
-        @empty
-          <p class="text-muted mb-0">Belum ada pesan.</p>
-        @endforelse
-      </div>
-    </div>
+            <div class="card-body">
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="small text-muted">Dokter Pengirim</div>
+                        <div>{{ $konsultasi->dokterPengirim->name ?? '-' }}</div>
+                        <div class="small text-muted">{{ $konsultasi->rsAsal->nama ?? '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">Dokter Tujuan</div>
+                        <div>{{ $konsultasi->dokterTujuan->name ?? '-' }}</div>
+                        <div class="small text-muted">{{ $konsultasi->rsTujuan->nama ?? '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">Status Consent</div>
+                        <div class="fw-semibold text-capitalize">{{ $konsultasi->consent_status }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">Dikirim</div>
+                        <div>{{ optional($konsultasi->submitted_at)->format('d/m/Y H:i') ?? '-' }}</div>
+                    </div>
+                </div>
 
-    @if($canReply)
-      <div class="card shadow-sm">
-        <div class="card-header bg-light fw-semibold">Balas Konsultasi</div>
-        <div class="card-body">
-          <form method="POST" action="{{ route('konsultasi.balas', $konsultasi) }}">
-            @csrf
-            <div class="mb-3">
-              <label class="form-label">Jenis Pesan</label>
-              <select name="jenis_pesan" class="form-select" required>
-                <option value="message">Pesan / Diskusi</option>
-                @if($isTargetDoctorUser)
-                  <option value="answer">Jawaban Klinis</option>
-                  <option value="request_more_info">Minta Info Tambahan</option>
+                <hr>
+
+                <div class="mb-3">
+                    <div class="small text-muted">Alasan Konsultasi</div>
+                    <div class="multiline">{{ $konsultasi->alasan_konsultasi }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Pertanyaan Klinis</div>
+                    <div class="multiline">{{ $konsultasi->pertanyaan_konsultasi ?: '-' }}</div>
+                </div>
+                <div class="mb-3">
+                    <div class="small text-muted">Ringkasan Klinis</div>
+                    <div class="multiline">{{ $konsultasi->ringkasan_klinis ?: '-' }}</div>
+                </div>
+                <div class="row g-3">
+                    <div class="col-md-6">
+                        <div class="small text-muted">Diagnosis Kerja</div>
+                        <div class="multiline">{{ $konsultasi->diagnosis_kerja ?: '-' }}</div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="small text-muted">Terapi Berjalan</div>
+                        <div class="multiline">{{ $konsultasi->terapi_berjalan ?: '-' }}</div>
+                    </div>
+                </div>
+                <div class="mt-3">
+                    <div class="small text-muted">Hasil Penunjang</div>
+                    <div class="multiline">{{ $konsultasi->hasil_penunjang ?: '-' }}</div>
+                </div>
+            </div>
+        </div>
+
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light fw-semibold">Percakapan Konsultasi</div>
+            <div class="card-body">
+                @forelse($konsultasi->pesan as $message)
+                    <div class="border rounded p-3 mb-3">
+                        <div class="d-flex justify-content-between align-items-start gap-2 mb-2">
+                            <div>
+                                <div class="fw-semibold">{{ $message->pengirim->name ?? '-' }}</div>
+                                <div class="small text-muted">{{ \App\Models\KonsultasiPesan::typeLabels()[$message->tipe] ?? ucfirst($message->tipe) }}</div>
+                            </div>
+                            <div class="small text-muted">{{ $message->created_at->format('d/m/Y H:i') }}</div>
+                        </div>
+                        <div class="multiline">{{ $message->pesan }}</div>
+                    </div>
+                @empty
+                    <div class="text-muted">Belum ada balasan. Dokter tujuan bisa mulai merespons setelah membuka konsultasi ini.</div>
+                @endforelse
+
+                @if($canReply)
+                    <hr>
+                    <h6 class="mb-3">Balas Konsultasi</h6>
+                    <form method="POST" action="{{ route('konsultasi.reply', $konsultasi) }}">
+                        @csrf
+                        <div class="row g-3">
+                            <div class="col-md-4">
+                                <label class="form-label">Jenis Balasan</label>
+                                <select name="tipe" class="form-select" required>
+                                    @foreach($replyTypes as $value => $label)
+                                        <option value="{{ $value }}">{{ $label }}</option>
+                                    @endforeach
+                                </select>
+                            </div>
+                            <div class="col-12">
+                                <label class="form-label">Pesan</label>
+                                <textarea name="pesan" rows="4" class="form-control" required></textarea>
+                            </div>
+                            <div class="col-12">
+                                <button type="submit" class="btn btn-primary">Kirim Balasan</button>
+                            </div>
+                        </div>
+                    </form>
                 @endif
-              </select>
             </div>
-            <div class="mb-3">
-              <label class="form-label">Isi Pesan</label>
-              <textarea name="isi_pesan" rows="4" class="form-control" required></textarea>
-            </div>
-            <button class="btn btn-primary">
-              <i class="fas fa-paper-plane me-1"></i> Kirim Balasan
-            </button>
-          </form>
         </div>
-      </div>
-    @endif
-  </div>
 
-  <div class="col-lg-4">
-    <div class="card shadow-sm mb-3">
-      <div class="card-header bg-light fw-semibold">Consent</div>
-      <div class="card-body">
-        <table class="table table-sm mb-0">
-          <tr>
-            <th>Status</th>
-            <td>{{ ucfirst(str_replace('_', ' ', $konsultasi->consent_status)) }}</td>
-          </tr>
-          <tr>
-            <th>Pemberi</th>
-            <td>{{ $konsultasi->consent_granted_by_name ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Peran</th>
-            <td>{{ $konsultasi->consent_granted_by_role ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Metode</th>
-            <td>{{ $konsultasi->consent_method ?: '-' }}</td>
-          </tr>
-          <tr>
-            <th>Waktu</th>
-            <td>{{ $konsultasi->consent_granted_at?->format('d/m/Y H:i') ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Berlaku Sampai</th>
-            <td>{{ $konsultasi->consent_expires_at?->format('d/m/Y H:i') ?? '-' }}</td>
-          </tr>
-          <tr>
-            <th>Catatan</th>
-            <td class="multiline">{{ $konsultasi->consent_notes ?: '-' }}</td>
-          </tr>
-        </table>
-      </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-semibold">Audit Trail</div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-sm table-bordered align-middle mb-0">
+                        <thead class="table-light">
+                            <tr>
+                                <th>Waktu</th>
+                                <th>Aksi</th>
+                                <th>Pengguna</th>
+                                <th>Detail</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($konsultasi->auditLogs as $log)
+                                <tr>
+                                    <td>{{ $log->created_at->format('d/m/Y H:i') }}</td>
+                                    <td>{{ ucfirst(str_replace('_', ' ', $log->aksi)) }}</td>
+                                    <td>{{ $log->user->name ?? '-' }}</td>
+                                    <td class="small text-muted">
+                                        @if($log->payload)
+                                            {{ collect($log->payload)->map(fn ($value, $key) => $key.': '.$value)->implode(' | ') }}
+                                        @else
+                                            -
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center text-muted">Belum ada log.</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <div class="card shadow-sm mb-3">
-      <div class="card-header bg-light fw-semibold">Aksi</div>
-      <div class="card-body d-grid gap-2">
-        @if($needsSourceSubmission)
-          <div class="alert alert-warning mb-0">
-            Konsultasi ini belum terkirim ke dokter tujuan. Lengkapi consent pasien lewat tombol <strong>Edit</strong>, lalu gunakan <strong>Kirim Konsultasi</strong> agar dokter tujuan bisa menerima dan membalas.
-          </div>
-        @endif
+    <div class="col-12 col-xl-4">
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light fw-semibold">Aksi</div>
+            <div class="card-body d-grid gap-2">
+                @if($isTarget && in_array($konsultasi->status, [\App\Models\Konsultasi::STATUS_TERKIRIM, \App\Models\Konsultasi::STATUS_DIBACA], true))
+                    <form method="POST" action="{{ route('konsultasi.accept', $konsultasi) }}">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit" class="btn btn-success w-100">ACC Konsultasi</button>
+                    </form>
+                @endif
 
-        @if($canSubmit)
-          <form method="POST" action="{{ route('konsultasi.submit', $konsultasi) }}">
-            @csrf
-            @method('PATCH')
-            <button class="btn btn-primary w-100" onclick="return confirm('Kirim konsultasi ini sekarang?')">
-              <i class="fas fa-paper-plane me-1"></i> Kirim Konsultasi
-            </button>
-          </form>
-        @endif
+                @if(($isSender || $isTarget) && !in_array($konsultasi->status, [\App\Models\Konsultasi::STATUS_DRAFT, \App\Models\Konsultasi::STATUS_DITUTUP, \App\Models\Konsultasi::STATUS_DIRUJUK], true))
+                    <form method="POST" action="{{ route('konsultasi.close', $konsultasi) }}">
+                        @csrf
+                        @method('PATCH')
+                        <button type="submit" class="btn btn-outline-secondary w-100">Tutup Konsultasi</button>
+                    </form>
+                @endif
 
-        @if($canAccept)
-          <form method="POST" action="{{ route('konsultasi.ubahStatus', [$konsultasi, 'accepted']) }}">
-            @csrf
-            @method('PATCH')
-            <button class="btn btn-success w-100" onclick="return confirm('Terima konsultasi ini?')">
-              <i class="fas fa-check me-1"></i> Terima Konsultasi
-            </button>
-          </form>
+                @if($isSender && $konsultasi->consent_status === \App\Models\Konsultasi::CONSENT_DIBERIKAN && !$konsultasi->rujukan_id && $konsultasi->status !== \App\Models\Konsultasi::STATUS_DRAFT)
+                    <form method="POST" action="{{ route('konsultasi.escalate', $konsultasi) }}">
+                        @csrf
+                        <button type="submit" class="btn btn-primary w-100">Lanjutkan Menjadi Rujukan</button>
+                    </form>
+                @endif
 
-          <form method="POST" action="{{ route('konsultasi.ubahStatus', [$konsultasi, 'rejected']) }}">
-            @csrf
-            @method('PATCH')
-            <button class="btn btn-outline-danger w-100" onclick="return confirm('Tolak konsultasi ini?')">
-              <i class="fas fa-times me-1"></i> Tolak Konsultasi
-            </button>
-          </form>
-        @endif
+                @if($konsultasi->rujukan_id)
+                    <a href="{{ route('rujukan.show', $konsultasi->rujukan_id) }}" class="btn btn-outline-primary w-100">
+                        Buka Rujukan Resmi
+                    </a>
+                @endif
+            </div>
+        </div>
 
-        @if($canClose)
-          <form method="POST" action="{{ route('konsultasi.tutup', $konsultasi) }}">
-            @csrf
-            @method('PATCH')
-            <button class="btn btn-outline-dark w-100" onclick="return confirm('Tutup konsultasi ini?')">
-              <i class="fas fa-box-archive me-1"></i> Tutup Konsultasi
-            </button>
-          </form>
-        @endif
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light fw-semibold">Persetujuan Pasien</div>
+            <div class="card-body small">
+                <div><strong>Status:</strong> {{ ucfirst($konsultasi->consent_status) }}</div>
+                <div><strong>Pemberi:</strong> {{ $konsultasi->consent_nama_pemberi ?? '-' }}</div>
+                <div><strong>Hubungan:</strong> {{ $konsultasi->consent_hubungan ?? '-' }}</div>
+                <div><strong>Metode:</strong> {{ $konsultasi->consent_metode ?? '-' }}</div>
+                <div><strong>Waktu:</strong> {{ optional($konsultasi->consent_diberikan_pada)->format('d/m/Y H:i') ?? '-' }}</div>
+                <div class="mt-2"><strong>Catatan:</strong></div>
+                <div class="multiline">{{ $konsultasi->consent_catatan ?: '-' }}</div>
+            </div>
+        </div>
 
-        @if($canEscalate)
-          <form method="POST" action="{{ route('konsultasi.eskalasi', $konsultasi) }}">
-            @csrf
-            <button class="btn btn-warning w-100" onclick="return confirm('Lanjutkan konsultasi ini menjadi rujukan resmi?')">
-              <i class="fas fa-arrow-right-arrow-left me-1"></i> Eskalasi ke Rujukan
-            </button>
-          </form>
-        @endif
+        <div class="card shadow-sm border-0 mb-3">
+            <div class="card-header bg-light fw-semibold">Kunjungan & SOAP</div>
+            <div class="card-body small">
+                <div><strong>Dokter asal:</strong> {{ $konsultasi->kunjungan->dokter->name ?? '-' }}</div>
+                <div><strong>Keluhan utama:</strong> {{ $konsultasi->kunjungan->keluhan_utama ?? '-' }}</div>
+                @if($latestSoap)
+                    <hr>
+                    <div class="fw-semibold">SOAP Terakhir</div>
+                    <div class="mt-2"><strong>Subjektif:</strong></div>
+                    <div class="multiline">{{ $latestSoap->subjektif ?? '-' }}</div>
+                    <div class="mt-2"><strong>Objektif:</strong></div>
+                    <div class="multiline">{{ $latestSoap->objektif ?? '-' }}</div>
+                    <div class="mt-2"><strong>Assessment:</strong></div>
+                    <div class="multiline">{{ $latestSoap->assessment ?? '-' }}</div>
+                    <div class="mt-2"><strong>Plan:</strong></div>
+                    <div class="multiline">{{ $latestSoap->plan ?? '-' }}</div>
+                @endif
+            </div>
+        </div>
 
-        @if($konsultasi->rujukan)
-          <a href="{{ route('rujukan.show', $konsultasi->rujukan) }}" class="btn btn-outline-success">
-            <i class="fas fa-file-medical me-1"></i> Lihat Rujukan
-          </a>
-        @endif
-
-        @if(!$needsSourceSubmission && !$canSubmit && !$canAccept && !$canClose && !$canEscalate)
-          <div class="text-muted small">
-            Belum ada aksi yang tersedia untuk status konsultasi saat ini.
-          </div>
-        @endif
-      </div>
+        <div class="card shadow-sm border-0">
+            <div class="card-header bg-light fw-semibold">Berkas Medis Terkait</div>
+            <div class="card-body small">
+                @forelse($konsultasi->kunjungan->berkasMedis as $berkas)
+                    <div class="border rounded p-2 mb-2">
+                        <div class="fw-semibold">{{ $berkas->nama_file }}</div>
+                        <div class="text-muted">{{ strtoupper($berkas->kategori ?? $berkas->mime ?? 'berkas') }}</div>
+                        <a href="{{ asset('storage/'.$berkas->path) }}" target="_blank" class="small">Buka berkas</a>
+                    </div>
+                @empty
+                    <div class="text-muted">Belum ada berkas medis yang terhubung ke kunjungan ini.</div>
+                @endforelse
+            </div>
+        </div>
     </div>
-
-    <div class="card shadow-sm">
-      <div class="card-header bg-light fw-semibold">Audit Trail</div>
-      <div class="card-body">
-        @forelse($konsultasi->auditLogs as $log)
-          <div class="border-start border-3 ps-3 mb-3">
-            <div class="fw-semibold">{{ ucfirst(str_replace('_', ' ', $log->event_type)) }}</div>
-            <div class="small text-muted">{{ $log->created_at->format('d/m/Y H:i:s') }}</div>
-            <div class="small text-muted">{{ $log->actor->name ?? 'Sistem' }}</div>
-            <div>{{ $log->deskripsi }}</div>
-          </div>
-        @empty
-          <p class="text-muted mb-0">Belum ada audit log.</p>
-        @endforelse
-      </div>
-    </div>
-  </div>
 </div>
 @endsection
