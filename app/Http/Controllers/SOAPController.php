@@ -14,6 +14,8 @@ use PDF;
 
 class SOAPController extends Controller
 {
+    private const BERKAS_DISKS = ['local', 'public'];
+
     private function authorizeView(SOAP $soap): void
     {
         abort_unless(
@@ -25,6 +27,20 @@ class SOAPController extends Controller
     private function visibleKunjunganQuery()
     {
         return Kunjungan::query()->visibleTo(Auth::user());
+    }
+
+    private function deleteBerkasFile(BerkasMedis $berkas): void
+    {
+        if (!$berkas->path) {
+            return;
+        }
+
+        foreach (self::BERKAS_DISKS as $disk) {
+            if (Storage::disk($disk)->exists($berkas->path)) {
+                Storage::disk($disk)->delete($berkas->path);
+                return;
+            }
+        }
     }
 
     public function index(Request $request)
@@ -157,7 +173,7 @@ class SOAPController extends Controller
             if (!$file) continue;
             if (method_exists($file, 'isValid') && !$file->isValid()) continue;
     
-            $path = $file->store('berkas', 'public');
+            $path = $file->store('berkas', 'local');
     
             $soap->berkas()->create([
                 'kunjungan_id' => $soap->kunjungan_id,                 // penting agar tidak error default value
@@ -260,7 +276,7 @@ class SOAPController extends Controller
     
             // hapus
             if (!empty($row['_delete'])) {
-                Storage::disk('public')->delete($bk->path);
+                $this->deleteBerkasFile($bk);
                 $bk->delete();
                 continue;
             }
@@ -273,10 +289,10 @@ class SOAPController extends Controller
             // replace file
             if ($request->hasFile("berkas_lama.$id.file")) {
                 $file    = $request->file("berkas_lama.$id.file");
-                $newPath = $file->store('berkas', 'public');
+                $newPath = $file->store('berkas', 'local');
     
                 // hapus file lama
-                Storage::disk('public')->delete($bk->path);
+                $this->deleteBerkasFile($bk);
     
                 $bk->path      = $newPath;
                 $bk->nama_file = $file->getClientOriginalName();
@@ -297,7 +313,7 @@ class SOAPController extends Controller
         foreach ((array)$files as $i => $file) {
             if (!$file) continue;
     
-            $path = $file->store('berkas', 'public');
+            $path = $file->store('berkas', 'local');
             $soap->berkas()->create([
                 'kunjungan_id' => $soap->kunjungan_id,
                 'kategori'     => $kats[$i] ?? 'LAIN',

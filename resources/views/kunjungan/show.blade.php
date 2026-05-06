@@ -128,7 +128,7 @@
         <tr>
           <td>{{ $i+1 }}</td>
           <td>{{ strtoupper($b->jenis) }}</td>
-          <td><a href="{{ asset('storage/'.$b->path) }}" target="_blank">{{ $b->nama_file }}</a></td>
+          <td><a href="{{ route('berkas.file', $b) }}" target="_blank">{{ $b->nama_file }}</a></td>
           <td>{{ $b->uploader->name ?? '-' }}</td>
           <td>
             <a href="{{ route('berkas.edit',$b->id) }}" class="btn btn-warning btn-sm">Edit</a>

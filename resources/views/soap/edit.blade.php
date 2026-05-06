@@ -94,7 +94,7 @@
                     <div class="col-12 col-md-6">
                       <div class="small text-muted mb-1">
                         File saat ini:
-                        <a href="{{ Storage::disk('public')->url($b->path) }}" target="_blank">
+                        <a href="{{ route('berkas.file', $b) }}" target="_blank">
                           {{ $b->nama_file }}
                         </a>
                       </div>
@@ -181,7 +181,7 @@
           <td>{{ $i + 1 }}</td>
           <td>{{ strtoupper($b->kategori) }}</td>
           <td>
-            <a href="{{ Storage::disk('public')->url($b->path) }}" target="_blank">
+            <a href="{{ route('berkas.file', $b) }}" target="_blank">
               {{ $b->nama_file }}
             </a>
           </td>

@@ -50,7 +50,7 @@
                     <div class="row g-3 mt-1">
                       @foreach($soap->berkas as $b)
                         @php
-                          $url = asset('storage/'.$b->path);
+                          $url = route('berkas.file', $b);
                           $ext = strtolower(pathinfo($b->path, PATHINFO_EXTENSION));
                           $isImage = in_array($ext, ['jpg','jpeg','png','gif','webp','bmp']);
                         @endphp
@@ -83,7 +83,7 @@
                       @foreach($soap->berkas as $b)
                         <li>
                           [{{ $b->kategori ?? 'LAIN' }}]
-                          <a href="{{ asset('storage/'.$b->path) }}" target="_blank">{{ $b->nama_file }}</a>
+                          <a href="{{ route('berkas.file', $b) }}" target="_blank">{{ $b->nama_file }}</a>
                           <small class="text-muted">— {{ $b->uploader->name ?? 'User' }}</small>
                         </li>
                       @endforeach
@@ -135,7 +135,7 @@
           <td>{{ $i + 1 }}</td>
           <td>{{ strtoupper($b->kategori) }}</td>
           <td>
-            <a href="{{ Storage::disk('public')->url($b->path) }}" target="_blank">
+            <a href="{{ route('berkas.file', $b) }}" target="_blank">
               {{ $b->nama_file }}
             </a>
           </td>

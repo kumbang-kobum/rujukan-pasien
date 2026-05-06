@@ -10,12 +10,38 @@ use Illuminate\Support\Facades\Storage;
 
 class BerkasMedisController extends Controller
 {
+    private const BERKAS_DISKS = ['local', 'public'];
+
     private function authorizeBerkas(BerkasMedis $berkas): void
     {
         abort_unless(
             BerkasMedis::query()->visibleTo(auth()->user())->whereKey($berkas->id)->exists(),
             403
         );
+    }
+
+    private function resolveBerkasDisk(BerkasMedis $berkas): ?string
+    {
+        if (!$berkas->path) {
+            return null;
+        }
+
+        foreach (self::BERKAS_DISKS as $disk) {
+            if (Storage::disk($disk)->exists($berkas->path)) {
+                return $disk;
+            }
+        }
+
+        return null;
+    }
+
+    private function deleteBerkasFile(BerkasMedis $berkas): void
+    {
+        $disk = $this->resolveBerkasDisk($berkas);
+
+        if ($disk) {
+            Storage::disk($disk)->delete($berkas->path);
+        }
     }
 
     public function create(Request $request)
@@ -51,7 +77,7 @@ class BerkasMedisController extends Controller
         }
     
         $file = $request->file('file');
-        $path = $file->store('berkas','public');
+        $path = $file->store('berkas', 'local');
     
         BerkasMedis::create([
             'kunjungan_id' => $kunjungan->id,
@@ -87,12 +113,10 @@ class BerkasMedisController extends Controller
     
         $data = ['jenis' => $request->jenis];
         if ($request->hasFile('file')) {
-            if ($berka->path && Storage::disk('public')->exists($berka->path)) {
-                Storage::disk('public')->delete($berka->path);
-            }
+            $this->deleteBerkasFile($berka);
             $file = $request->file('file');
             $data['nama_file'] = $file->getClientOriginalName();
-            $data['path']      = $file->store('berkas','public');
+            $data['path']      = $file->store('berkas', 'local');
         }
         $berka->update($data);
     
@@ -105,15 +129,24 @@ class BerkasMedisController extends Controller
     {
         $this->authorizeBerkas($berka);
 
-        if ($berka->path && Storage::disk('public')->exists($berka->path)) {
-            Storage::disk('public')->delete($berka->path);
-        }
+        $this->deleteBerkasFile($berka);
         $idKunj = $berka->kunjungan_id;
         $berka->delete();
     
         $redirect = request('redirect'); // <— tambahkan
         return redirect()->to($redirect ?: route('kunjungan.show',$idKunj))
             ->with('success','Berkas berhasil dihapus.');
+    }
+
+    public function file(BerkasMedis $berka)
+    {
+        $this->authorizeBerkas($berka);
+
+        $disk = $this->resolveBerkasDisk($berka);
+
+        abort_unless($disk, 404, 'Hanya dapat diakses antar rumah sakit yang bersangkutan.');
+
+        return Storage::disk($disk)->response($berka->path, $berka->nama_file);
     }
 
     // public function create(Request $request)

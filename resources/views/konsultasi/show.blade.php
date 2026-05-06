@@ -254,7 +254,7 @@
                     <div class="border rounded p-2 mb-2">
                         <div class="fw-semibold">{{ $berkas->nama_file }}</div>
                         <div class="text-muted">{{ strtoupper($berkas->kategori ?? $berkas->mime ?? 'berkas') }}</div>
-                        <a href="{{ asset('storage/'.$berkas->path) }}" target="_blank" class="small">Buka berkas</a>
+                        <a href="{{ route('berkas.file', $berkas) }}" target="_blank" class="small">Buka berkas</a>
                     </div>
                 @empty
                     <div class="text-muted">Belum ada berkas medis yang terhubung ke kunjungan ini.</div>

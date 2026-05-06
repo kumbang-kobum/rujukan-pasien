@@ -9,7 +9,6 @@ use App\Http\Controllers\SOAPController;
 use App\Http\Controllers\UserController;
 use App\Http\Controllers\BerkasMedisController;
 use App\Http\Controllers\AjaxRujukanController;
-use Illuminate\Support\Facades\Storage;
 use App\Http\Controllers\AdminController;
 use App\Http\Controllers\KonsultasiController;
 use App\Http\Controllers\RumahSakitController;
@@ -18,16 +17,6 @@ use App\Http\Controllers\ProfileController;
 
 Route::get('/', function () {
     return redirect('/login');
-});
-
-Route::get('/berkas/file/{filename}', function ($filename) {
-    $path = storage_path('app/public/berkas/'.$filename);
-
-    if (!file_exists($path)) {
-        abort(404);
-    }
-
-    return response()->file($path);
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -65,6 +54,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('soap/{soap}/cetak', [SOAPController::class,'cetak'])->name('soap.cetak');
         Route::resource('rujukan', RujukanController::class);
         Route::patch('/rujukan/{rujukan}/status/{status}', [RujukanController::class,'ubahStatus'])->name('rujukan.ubahStatus');
+        Route::get('berkas/{berka}/file', [BerkasMedisController::class, 'file'])->name('berkas.file');
         Route::resource('berkas', BerkasMedisController::class)->except(['index']);
 
         Route::patch('/kunjungan/{kunjungan}/pulangkan', [KunjunganController::class, 'pulangkan'])
