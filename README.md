@@ -369,9 +369,31 @@ DB_PASSWORD=isi_password_kuat
 SESSION_DRIVER=database
 QUEUE_CONNECTION=database
 CACHE_STORE=database
+
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=alamat_gmail_anda@gmail.com
+MAIL_PASSWORD=app_password_gmail
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=alamat_gmail_anda@gmail.com
+MAIL_FROM_NAME="${APP_NAME}"
 ```
 
 Jangan commit file `.env` ke GitHub.
+
+Untuk Gmail, gunakan **App Password**, bukan password login Gmail biasa.
+Aktifkan 2-Step Verification di akun Google, buat App Password untuk aplikasi
+mail, lalu masukkan nilainya ke `MAIL_PASSWORD`. Sebaiknya
+`MAIL_FROM_ADDRESS` sama dengan `MAIL_USERNAME`, kecuali memakai SMTP provider
+yang memang mengizinkan alamat pengirim berbeda.
+
+Jika mengganti konfigurasi `.env` di server, jalankan:
+
+```bash
+php artisan optimize:clear
+php artisan config:cache
+```
 
 ### 5. Migrasi, storage, permission, dan cache
 
@@ -426,8 +448,9 @@ rewrite Apache aktif.
 
 ### 7. Queue worker, jika dipakai
 
-Project memakai `QUEUE_CONNECTION=database`. Jika fitur notifikasi atau proses
-background perlu berjalan otomatis, jalankan queue worker.
+Project memakai `QUEUE_CONNECTION=database`. Notifikasi rujukan via email
+dikirim melalui queue, jadi email akan masuk ke tabel `jobs` dulu dan baru
+terkirim jika queue worker berjalan.
 
 Contoh command Supervisor:
 
@@ -440,6 +463,22 @@ Jika memakai PHP aaPanel:
 ```bash
 cd /www/wwwroot/rujukan-pasien && /www/server/php/82/bin/php artisan queue:work --tries=3 --timeout=90
 ```
+
+Untuk tes manual tanpa Supervisor:
+
+```bash
+php artisan queue:work --once
+php artisan queue:failed
+```
+
+Jika ingin email dikirim langsung tanpa worker pada instalasi kecil, ubah:
+
+```env
+QUEUE_CONNECTION=sync
+```
+
+Untuk production, rekomendasinya tetap `QUEUE_CONNECTION=database` ditambah
+queue worker yang aktif lewat Supervisor atau service manager aaPanel.
 
 ## Update Server aaPanel dari Repo GitHub
 
@@ -633,6 +672,54 @@ php artisan optimize:clear
 php artisan config:cache
 php artisan view:cache
 ```
+
+### Email rujukan tidak masuk
+
+Cek dulu email dokter tujuan pada menu pengguna. Dokter yang menjadi tujuan
+rujukan harus punya alamat email yang valid.
+
+Pastikan konfigurasi SMTP di `.env` sudah benar:
+
+```env
+MAIL_MAILER=smtp
+MAIL_HOST=smtp.gmail.com
+MAIL_PORT=587
+MAIL_USERNAME=alamat_gmail_anda@gmail.com
+MAIL_PASSWORD=app_password_gmail
+MAIL_ENCRYPTION=tls
+MAIL_FROM_ADDRESS=alamat_gmail_anda@gmail.com
+MAIL_FROM_NAME="${APP_NAME}"
+```
+
+Jika memakai Gmail, `MAIL_PASSWORD` harus App Password. Setelah mengubah `.env`,
+clear dan cache ulang konfigurasi:
+
+```bash
+php artisan optimize:clear
+php artisan config:cache
+```
+
+Jika `QUEUE_CONNECTION=database`, email tidak akan terkirim sampai queue worker
+berjalan. Tes manual:
+
+```bash
+php artisan queue:work --once
+php artisan queue:failed
+```
+
+Cek error detail di log:
+
+```bash
+tail -n 100 storage/logs/laravel.log
+```
+
+Jika ingin memastikan email terkirim langsung tanpa worker, gunakan sementara:
+
+```env
+QUEUE_CONNECTION=sync
+```
+
+Setelah itu jalankan lagi `php artisan optimize:clear`.
 
 ### Upload atau storage tidak tampil
 

@@ -31,7 +31,7 @@ class RujukanMasukNotification extends Notification implements ShouldQueue
         ]);
 
         $noRawat = $r->kunjungan?->no_rawat ?? '-';
-        $nmPasien = $r->kunjungan?->pasien?->nm_pasien ?? '-';
+        $nmPasien = $r->kunjungan?->pasien?->nama ?? '-';
         // no RM bisa ada di pasien atau kunjungan, ambil yang ada
         $noRM = $r->kunjungan?->pasien?->no_rkm_medis
               ?? $r->kunjungan?->no_rkm_medis
