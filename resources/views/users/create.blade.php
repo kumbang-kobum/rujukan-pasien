@@ -55,10 +55,14 @@
 
       <div class="mb-3">
         <label class="form-label">Rumah Sakit</label>
-        <select name="rumah_sakit_id" class="form-select @error('rumah_sakit_id') is-invalid @enderror" required>
-          <option value="">Pilih RS…</option>
+        <select name="rumah_sakit_id" class="form-select @error('rumah_sakit_id') is-invalid @enderror">
+          @if(auth()->user()->isSuperAdmin())
+            <option value="">Platform / tidak terikat RS</option>
+          @else
+            <option value="">Pilih RS…</option>
+          @endif
           @foreach($rsList as $rs)
-            <option value="{{ $rs->id }}" {{ old('rumah_sakit_id')==$rs->id ? 'selected' : '' }}>
+            <option value="{{ $rs->id }}" {{ (string) old('rumah_sakit_id', auth()->user()->isAdminRs() ? auth()->user()->rumah_sakit_id : '') === (string) $rs->id ? 'selected' : '' }}>
               {{ $rs->nama }}
             </option>
           @endforeach
@@ -68,10 +72,10 @@
       <div class="mb-3">
         <label class="form-label">Role</label>
         <select name="role" class="form-select" required>
-          <option value="" disabled selected>Pilih...</option>
-          <option value="admin">Admin</option>
-          <option value="dokter">Dokter</option>
-          <option value="perawat">Perawat</option>
+          <option value="" disabled {{ old('role') ? '' : 'selected' }}>Pilih...</option>
+          @foreach($roleOptions as $value => $label)
+            <option value="{{ $value }}" {{ old('role') === $value ? 'selected' : '' }}>{{ $label }}</option>
+          @endforeach
         </select>
         @error('role') <div class="text-danger small">{{ $message }}</div> @enderror
       </div>

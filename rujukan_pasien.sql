@@ -907,14 +907,14 @@ CREATE TABLE `users` (
   `avatar_path` varchar(255) DEFAULT NULL,
   `email_verified_at` timestamp NULL DEFAULT NULL,
   `password` varchar(255) NOT NULL,
-  `role` enum('dokter','perawat','admin') NOT NULL DEFAULT 'dokter',
-  `rumah_sakit_id` bigint(20) unsigned NOT NULL,
+  `role` enum('super_admin','admin_rs','dokter','petugas') NOT NULL DEFAULT 'dokter',
+  `rumah_sakit_id` bigint(20) unsigned DEFAULT NULL,
   `remember_token` varchar(100) DEFAULT NULL,
   `created_at` timestamp NULL DEFAULT NULL,
   `updated_at` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `users_email_unique` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=52 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+) ENGINE=InnoDB AUTO_INCREMENT=53 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 
 --
@@ -924,9 +924,9 @@ CREATE TABLE `users` (
 LOCK TABLES `users` WRITE;
 /*!40000 ALTER TABLE `users` DISABLE KEYS */;
 INSERT INTO `users` VALUES
-(1,'Admin RS Unand','afetolink@gmail.com','avatars/KrQEG1mU9baRdYMaT2NoYJh9rlBE9lZLv9KDq3HH.png',NULL,'$2y$12$sheY3JRr3lQ4Ob.NIQPLu.9SX5aT44tQMuHJAF805Am8k1mpZw9rC','admin',5,NULL,'2025-10-25 02:11:22','2026-01-21 03:11:54'),
-(8,'Admin RSUD Sungai Dareh','sungaidareh@gmail.com',NULL,NULL,'$2y$12$zppO/f/RtfSxGlfM4fcVzuZIQbH9Plrdor4d6RQFdvYcJuoFy/KbS','admin',4,'5TKvKaWzaMEVEmeDHbywmTLAF0HvsCr6gXTB24kFSc6l3gR7egofjW8tepIa','2025-10-30 02:05:29','2025-10-30 02:05:29'),
-(9,'Admin RS M. Djamil Padang','rsmjamil@gmail.com',NULL,NULL,'$2y$12$oq.uxVCWLBiP8N/z8OFgF.fKXiTKcsouLasmZd7kchGRzzSmjzk/2','admin',3,NULL,'2025-10-30 02:06:26','2025-11-03 05:58:37'),
+(1,'Admin RS Unand','afetolink@gmail.com','avatars/KrQEG1mU9baRdYMaT2NoYJh9rlBE9lZLv9KDq3HH.png',NULL,'$2y$12$sheY3JRr3lQ4Ob.NIQPLu.9SX5aT44tQMuHJAF805Am8k1mpZw9rC','admin_rs',5,NULL,'2025-10-25 02:11:22','2026-01-21 03:11:54'),
+(8,'Admin RSUD Sungai Dareh','sungaidareh@gmail.com',NULL,NULL,'$2y$12$zppO/f/RtfSxGlfM4fcVzuZIQbH9Plrdor4d6RQFdvYcJuoFy/KbS','admin_rs',4,'5TKvKaWzaMEVEmeDHbywmTLAF0HvsCr6gXTB24kFSc6l3gR7egofjW8tepIa','2025-10-30 02:05:29','2025-10-30 02:05:29'),
+(9,'Admin RS M. Djamil Padang','rsmjamil@gmail.com',NULL,NULL,'$2y$12$oq.uxVCWLBiP8N/z8OFgF.fKXiTKcsouLasmZd7kchGRzzSmjzk/2','admin_rs',3,NULL,'2025-10-30 02:06:26','2025-11-03 05:58:37'),
 (10,'dr. Rina Gustuti, SpOG,Subs-KFM','rinagustuti2308@gmail.com',NULL,NULL,'$2y$12$uWgRuVvDrqi0yHxOHD9DYe6wQ3EihX/n4GynHjqC6QgXDMGiERmc.','dokter',5,'sZN5RUSqO0PPZ66imYD3EvDJOX1lWzslyHjC9bwlrpKom1BwjnTb8Jbf8VNI','2025-10-30 02:08:36','2025-10-30 02:08:36'),
 (11,'dr. Pom Harry Satria, SpOG,Subs-Obsos','harrysatria.pom@gmail.com',NULL,NULL,'$2y$12$NGAeR3v4Qb7oxobPOrvRk.ncAki1D5k2cdaHUhyPR4/g6tdrl10lq','dokter',4,'xJyBjwcKj2bzd5FF7gW83ZsEhqw93DwdkvM0yJqGXvzzoh8qX5zjqZHuvWe3','2025-10-30 02:09:50','2025-10-30 06:01:30'),
 (12,'dr. Widayat, SpOG','dokterwidayat@gmail.com',NULL,NULL,'$2y$12$q1prKYm4Qg3YiH7MBIYlgOftJnszqVFtHziHifZlD1AIVK/Jy61Yq','dokter',4,NULL,'2025-10-30 02:11:26','2025-10-30 06:02:17'),
@@ -942,15 +942,15 @@ INSERT INTO `users` VALUES
 (22,'Dokter Jaga','dokterrsudsungaidareh@gmail.com',NULL,NULL,'$2y$12$rvscW6rrlcZW7NBNmil82uuaoqN4/odYYmUrIcEAXtd/mQRh2eiXO','dokter',4,NULL,'2025-10-30 06:19:02','2025-10-30 06:19:02'),
 (23,'Dokter Jaga','dokterrsupdjamil@gmail.com',NULL,NULL,'$2y$12$oTY31k2pOgrrxa2tN/SHE.do2l3l3N3huoEYDahSlQCjUHAs8U14e','dokter',3,NULL,'2025-10-30 06:20:02','2025-10-30 06:20:02'),
 (24,'Dokter Jaga','dokterrsunpad@gmail.com',NULL,NULL,'$2y$12$HURVXG28qBrxlDSQAhSUT.Q0B5aCiM3ml2x5vV34Zh4znoswUlLy2','dokter',5,NULL,'2025-10-30 06:20:59','2025-10-30 06:20:59'),
-(25,'PONEK','ponekrsudsungaidareh@gmail.com',NULL,NULL,'$2y$12$vhFsp.scsoUCPu7ar5UqmexYNWVGa4LalBZZJMjjWukoSdDttXASu','perawat',4,NULL,'2025-10-30 06:22:08','2025-10-30 06:22:08'),
-(26,'PONEK 1','ponek1@gmail.com',NULL,NULL,'$2y$12$Q09cZgzywqbiVBoVUpdhHO.xwaj0SmY20MbE/PpSxrphzNRaPdfg2','perawat',3,NULL,'2025-10-30 07:01:06','2025-10-30 07:01:06'),
-(27,'PONEK 3','ponekuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$aJPMU8nLjz2qd216BZbsE.E9YeMYhPTxCa4eSf9zStUj24N3Cpt8u','perawat',5,NULL,'2025-10-30 07:02:16','2025-10-30 07:02:16'),
-(28,'laboratorium','laboratoriumsungaidareh@gmail.com',NULL,NULL,'$2y$12$ZaViNW6tQ.qhjmOF3zVV/efAjCANfUBOVidSuiVW21SNREBrpd80m','perawat',4,NULL,'2025-10-30 07:04:19','2025-10-30 07:04:19'),
-(29,'laboratorium 1','laboratoriumrsupdjamilpadang@gmail.com',NULL,NULL,'$2y$12$Td2zOBcWMQN.xyeSxf3JYeX/R9ZUINffppzp8BUohNaSFNlN4.A.6','perawat',3,NULL,'2025-10-30 07:07:21','2025-10-30 07:07:21'),
-(30,'laboratorium 2','laboratoriumuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$u5WD2XZHnmkyolNRWZep2upKZMyyXv.X/1jOhXMnsBfuHBgGyV.IS','perawat',5,NULL,'2025-10-30 07:08:03','2025-10-30 07:08:03'),
-(31,'RADIOLOGI','radiologisungaidareh@gmail.com',NULL,NULL,'$2y$12$o/3J5k8Bji5bpMtV.sA86OrVcjHO50k33W.VdaBoA/N9SMrhyuSJe','perawat',4,NULL,'2025-10-30 07:09:04','2025-10-30 07:09:04'),
-(32,'RADIOLOGI 1','radiologirsupdjamilpadang@gmail.com',NULL,NULL,'$2y$12$fVwhGouzuAeGfOsSFxUXnOCo3TzS3YMVV3fN9MQcNqY2hldDDFKuO','perawat',3,NULL,'2025-10-30 07:10:38','2025-10-30 07:10:38'),
-(33,'RADIOLOGI 2','radiologiuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$lPrToAksM53MiSZxNOPFD.YBMJl3Wd1CaZJqzyCa9ftI9YCEAz5qW','perawat',5,NULL,'2025-10-30 07:11:42','2025-10-30 07:11:42'),
+(25,'PONEK','ponekrsudsungaidareh@gmail.com',NULL,NULL,'$2y$12$vhFsp.scsoUCPu7ar5UqmexYNWVGa4LalBZZJMjjWukoSdDttXASu','petugas',4,NULL,'2025-10-30 06:22:08','2025-10-30 06:22:08'),
+(26,'PONEK 1','ponek1@gmail.com',NULL,NULL,'$2y$12$Q09cZgzywqbiVBoVUpdhHO.xwaj0SmY20MbE/PpSxrphzNRaPdfg2','petugas',3,NULL,'2025-10-30 07:01:06','2025-10-30 07:01:06'),
+(27,'PONEK 3','ponekuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$aJPMU8nLjz2qd216BZbsE.E9YeMYhPTxCa4eSf9zStUj24N3Cpt8u','petugas',5,NULL,'2025-10-30 07:02:16','2025-10-30 07:02:16'),
+(28,'laboratorium','laboratoriumsungaidareh@gmail.com',NULL,NULL,'$2y$12$ZaViNW6tQ.qhjmOF3zVV/efAjCANfUBOVidSuiVW21SNREBrpd80m','petugas',4,NULL,'2025-10-30 07:04:19','2025-10-30 07:04:19'),
+(29,'laboratorium 1','laboratoriumrsupdjamilpadang@gmail.com',NULL,NULL,'$2y$12$Td2zOBcWMQN.xyeSxf3JYeX/R9ZUINffppzp8BUohNaSFNlN4.A.6','petugas',3,NULL,'2025-10-30 07:07:21','2025-10-30 07:07:21'),
+(30,'laboratorium 2','laboratoriumuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$u5WD2XZHnmkyolNRWZep2upKZMyyXv.X/1jOhXMnsBfuHBgGyV.IS','petugas',5,NULL,'2025-10-30 07:08:03','2025-10-30 07:08:03'),
+(31,'RADIOLOGI','radiologisungaidareh@gmail.com',NULL,NULL,'$2y$12$o/3J5k8Bji5bpMtV.sA86OrVcjHO50k33W.VdaBoA/N9SMrhyuSJe','petugas',4,NULL,'2025-10-30 07:09:04','2025-10-30 07:09:04'),
+(32,'RADIOLOGI 1','radiologirsupdjamilpadang@gmail.com',NULL,NULL,'$2y$12$fVwhGouzuAeGfOsSFxUXnOCo3TzS3YMVV3fN9MQcNqY2hldDDFKuO','petugas',3,NULL,'2025-10-30 07:10:38','2025-10-30 07:10:38'),
+(33,'RADIOLOGI 2','radiologiuniversitasandalas@gmail.com',NULL,NULL,'$2y$12$lPrToAksM53MiSZxNOPFD.YBMJl3Wd1CaZJqzyCa9ftI9YCEAz5qW','petugas',5,NULL,'2025-10-30 07:11:42','2025-10-30 07:11:42'),
 (34,'Dr.dr. Dovy Djanas, SpOG, Subs-KFM','dovy.dj68@gmail.com',NULL,NULL,'$2y$12$n03LrHGZ9Ya8YFuXsBSb..uJRgQzdYeCTLZXsQULwHrw7Y/rPWQQi','dokter',3,NULL,'2025-11-03 06:03:53','2025-11-03 06:03:53'),
 (35,'Dr.dr. Defrin, SpOG, Subs-KFM','defrin_pdg@yahoo.com',NULL,NULL,'$2y$12$o1jvC2yzo9Uc3yveIwTwHO4fPpAzuhulRcRA14m.tAVv6wJPs0DzS','dokter',3,NULL,'2025-11-03 06:05:02','2025-11-03 06:05:02'),
 (36,'Dr. dr. Roza Sriyanti, SpOG, Subs-KFM','rozasyahrial@gmail.com',NULL,NULL,'$2y$12$4YZnWmE1snCVzfklual2deohp.mmgI/hHv5vrVW2qTjRCkTk5AEFC','dokter',3,NULL,'2025-11-03 06:06:31','2025-11-03 06:06:31'),
@@ -958,15 +958,16 @@ INSERT INTO `users` VALUES
 (38,'Dr. dr. Hudila Rifa Karmia, SpOG, Subs K-FM','hrkspogdr@gmail.com',NULL,NULL,'$2y$12$wSnmglo9SyKM90cL3dUOoOelz5BU2HZHtDvn6ynj6Fp8vZOMwZcOG','dokter',5,NULL,'2025-11-03 06:08:41','2025-11-03 06:08:41'),
 (40,'Dokter Jaga2','sungaidareh2@gmail.com',NULL,NULL,'$2y$12$B8IfSsPPQCY.DDrEqlOkeu6bK4NB3Ge3NM.oSjDVtohuxorVmVW0W','dokter',4,NULL,'2025-11-04 09:03:57','2025-11-04 09:03:57'),
 (41,'Dokter Jaga3','sungaidareh3@gmail.com',NULL,NULL,'$2y$12$JAodk6gf/NPiuBW3eZMfieo/pcC7XJ0u0F5Ih8zrMa8ZJpIejTnBq','dokter',4,NULL,'2025-11-13 01:43:28','2025-11-13 01:43:28'),
-(42,'ns. alnaira','irawan@gmail.com',NULL,NULL,'$2y$12$A4DINUa1IbeVD6K9JT.7W.EJFtJbRmo9zlNU17BCJOVfBSB7SRR.K','perawat',6,NULL,'2026-04-12 01:36:21','2026-04-12 01:36:21'),
+(42,'ns. alnaira','irawan@gmail.com',NULL,NULL,'$2y$12$A4DINUa1IbeVD6K9JT.7W.EJFtJbRmo9zlNU17BCJOVfBSB7SRR.K','petugas',6,NULL,'2026-04-12 01:36:21','2026-04-12 01:36:21'),
 (43,'dr nafasya','nafasya@gmail.com',NULL,NULL,'$2y$12$.RA0jVgcf/Rtoegn51UtT.QGol.meiGZtMUQWGmqh5nBWthvrqLJC','dokter',6,NULL,'2026-04-12 01:37:25','2026-04-12 01:37:25'),
-(44,'Admin RS Hj Kamino','rshajikamino@gmail.com',NULL,NULL,'$2y$12$ukgd.bjH1C3TpNwVzEAA8.TnW6CCrPu71rHASkcJzUob/JXlVBOpa','admin',6,NULL,'2026-04-12 01:38:33','2026-04-12 01:38:33'),
+(44,'Admin RS Hj Kamino','rshajikamino@gmail.com',NULL,NULL,'$2y$12$ukgd.bjH1C3TpNwVzEAA8.TnW6CCrPu71rHASkcJzUob/JXlVBOpa','admin_rs',6,NULL,'2026-04-12 01:38:33','2026-04-12 01:38:33'),
 (46,'dr. Juliana Askim','askimjuli93@gmail.com',NULL,NULL,'$2y$12$xoYH4l0QrfobvcGR88Y7Z.5szuJW7Drf1axTwk/XOfaR3ZBkikKYu','dokter',4,NULL,'2026-04-14 09:26:59','2026-04-14 09:26:59'),
 (47,'dr. Embun Dini','Embundini82@gmail.com',NULL,NULL,'$2y$12$1OqCGrxnNqogl40/PK0AdeMET6C9.WpKmwu.JWtyrX8pUFSNJSn.m','dokter',4,'uS0xYaeoI0RiEoo68t7fzGzM9CWxKseWKBTvd4FFb29I66f3tu8do7JGH9Y2','2026-04-14 09:30:19','2026-04-14 09:30:19'),
 (48,'dr. Muthiah R. Agus','muthiramadhani12@gmail.com',NULL,NULL,'$2y$12$fwho1pC0vUMMEoswvB9ol.lPFEyEA4k9CJSk0UPStZ18qJEUC3Cpm','dokter',4,NULL,'2026-04-14 09:31:33','2026-04-14 09:31:33'),
 (49,'dr. Aziagtma Trangguna','trangguna@gmail.com',NULL,NULL,'$2y$12$fJCnXc0fASfPm9B5erKYteq3/2QL.qx7vFyr7B.MZ4q19Efn38TQu','dokter',4,NULL,'2026-04-14 09:32:57','2026-04-14 09:32:57'),
 (50,'dr.nurafdaliza','nurafdaliza09@gmail.com',NULL,NULL,'$2y$12$ccJqf0Q/Ld.d.RpXljY.g.GbP08PV1fG3C5YOynX5RCRP1zfggUKu','dokter',4,NULL,'2026-04-15 07:49:42','2026-04-15 07:49:42'),
-(51,'dr.iwan setiawan','iwansetiawan007.is2781@gmail.com',NULL,NULL,'$2y$12$k1sczKftW2Zu9MeE6hheMeDyq9MY07PaEuGv1BkiRVOXoyQSbgmna','dokter',4,NULL,'2026-04-15 07:54:07','2026-04-15 07:54:07');
+(51,'dr.iwan setiawan','iwansetiawan007.is2781@gmail.com',NULL,NULL,'$2y$12$k1sczKftW2Zu9MeE6hheMeDyq9MY07PaEuGv1BkiRVOXoyQSbgmna','dokter',4,NULL,'2026-04-15 07:54:07','2026-04-15 07:54:07'),
+(52,'Super Admin Platform','superadmin@example.com',NULL,NULL,'$2y$10$omjXDPijdqn9ullPmLCfNu21EpZuTS9TaAl9TloVhQzUF4ugX0WJ6','super_admin',NULL,NULL,'2026-05-06 00:00:00','2026-05-06 00:00:00');
 /*!40000 ALTER TABLE `users` ENABLE KEYS */;
 UNLOCK TABLES;
 

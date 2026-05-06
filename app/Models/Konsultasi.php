@@ -63,7 +63,11 @@ class Konsultasi extends Model
 
     public function scopeVisibleTo($query, User $user)
     {
-        if ($user->isAdmin()) {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        if ($user->isAdminRs()) {
             return $query->where(function ($inner) use ($user) {
                 $inner->where('rumah_sakit_asal_id', $user->rumah_sakit_id)
                     ->orWhere('rumah_sakit_tujuan_id', $user->rumah_sakit_id);

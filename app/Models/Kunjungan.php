@@ -22,7 +22,6 @@ class Kunjungan extends Model
         'dokter_id',
         'user_id',
         'rumah_sakit_id',
-        'poli',
         'rajalranap',
         'tanggal_kunjungan',
         'waktu_masuk',

@@ -14,8 +14,8 @@ return new class extends Migration
             $table->string('email')->unique();
             $table->timestamp('email_verified_at')->nullable();
             $table->string('password');
-            $table->enum('role', ['dokter', 'perawat', 'admin'])->default('dokter');
-            $table->unsignedBigInteger('rumah_sakit_id'); // TANPA FOREIGN KEY DULU
+            $table->enum('role', ['super_admin', 'admin_rs', 'dokter', 'petugas'])->default('dokter');
+            $table->unsignedBigInteger('rumah_sakit_id')->nullable(); // Super admin platform tidak wajib terikat RS
             $table->rememberToken();
             $table->timestamps();
         });

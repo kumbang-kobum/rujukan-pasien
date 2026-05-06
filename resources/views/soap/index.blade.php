@@ -142,7 +142,7 @@
                             <a href="{{ route('soap.show',$s->id) }}" class="btn btn-info btn-sm">Lihat</a>
                             <a href="{{ route('soap.edit',$s->id) }}" class="btn btn-warning btn-sm">Edit</a>
 
-                            @if(auth()->check() && auth()->user()->role === 'admin')
+                            @if(auth()->check() && auth()->user()->isAdmin())
                                 <form action="{{ route('soap.destroy',$s->id) }}" method="POST" class="d-inline"
                                       onsubmit="return confirm('Hapus data ini? Tindakan tidak bisa dibatalkan.')">
                                     @csrf @method('DELETE')

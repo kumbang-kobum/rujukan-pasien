@@ -31,8 +31,9 @@ class Rujukan extends Model
 
     public function scopeVisibleTo($q, User $user)
     {
-        // // Admin boleh melihat semua
-        // if ($user->role === 'admin') return $q;
+        if ($user->isSuperAdmin()) {
+            return $q;
+        }
 
         $rsId = (int) $user->rumah_sakit_id;
 

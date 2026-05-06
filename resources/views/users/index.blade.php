@@ -19,17 +19,19 @@
     @endif
 
     <form class="row g-2 mb-3" method="get">
-      <div class="col-md-4">
+      <div class="{{ auth()->user()->isSuperAdmin() ? 'col-md-4' : 'col-md-8' }}">
         <input type="text" name="q" class="form-control" value="{{ $q }}" placeholder="Cari nama/email…">
       </div>
-      <div class="col-md-4">
-        <select name="rumah_sakit_id" class="form-select">
-          <option value="">— Semua RS —</option>
-          @foreach($rsList as $rs)
-            <option value="{{ $rs->id }}" {{ (string)$filterRs === (string)$rs->id ? 'selected' : '' }}>{{ $rs->nama }}</option>
-          @endforeach
-        </select>
-      </div>
+      @if(auth()->user()->isSuperAdmin())
+        <div class="col-md-4">
+          <select name="rumah_sakit_id" class="form-select">
+            <option value="">— Semua RS —</option>
+            @foreach($rsList as $rs)
+              <option value="{{ $rs->id }}" {{ (string)$filterRs === (string)$rs->id ? 'selected' : '' }}>{{ $rs->nama }}</option>
+            @endforeach
+          </select>
+        </div>
+      @endif
       <div class="col-md-4">
         <button class="btn btn-primary btn-sm">Filter</button>
         <a href="{{ route('users.index') }}" class="btn btn-outline-secondary btn-sm">Reset</a>
@@ -51,7 +53,7 @@
           <tr>
             <td>{{ $u->name }}</td>
             <td>{{ $u->email }}</td>
-            <td><span class="badge bg-secondary text-capitalize">{{ $u->role }}</span></td>
+            <td><span class="badge bg-secondary">{{ $u->role_label }}</span></td>
             <td>{{ $u->rumahSakit->nama ?? '-' }}</td>
             <td class="text-nowrap">
               <a href="{{ route('users.edit',$u->id) }}" class="btn btn-sm btn-warning">Edit</a>

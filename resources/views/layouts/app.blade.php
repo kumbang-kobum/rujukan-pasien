@@ -182,7 +182,7 @@
                     </li>
 
                     @php
-                        $canSeeClinical = Auth::user()->isAdmin() || Auth::user()->isDokter() || Auth::user()->isPerawat();
+                        $canSeeClinical = Auth::user()->canAccessClinical();
                     @endphp
 
                     @if($canSeeClinical)
@@ -206,7 +206,7 @@
                                 <i class="fas fa-exchange-alt me-1"></i> Rujukan
                             </a>
                         </li>
-                        @if(Auth::user()->isDokter() || Auth::user()->isAdmin())
+                        @if(Auth::user()->isDokter() || Auth::user()->isAdminRs())
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('konsultasi.*') ? 'active' : '' }}" href="{{ route('konsultasi.index') }}">
                                 <i class="fas fa-comment-medical me-1"></i> Konsultasi Antar Dokter
@@ -215,12 +215,14 @@
                         @endif
                     @endif
 
-                    @if(Auth::user()->isAdmin())
+                    @if(Auth::user()->canManageHospitals())
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('rumahsakit.*') ? 'active' : '' }}" href="{{ route('rumahsakit.index') }}">
                                 <i class="fas fa-hospital me-1"></i> Kelola Rumah Sakit
                             </a>
                         </li>
+                    @endif
+                    @if(Auth::user()->canManageUsers())
                         <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
                                 <i class="fas fa-users me-1"></i> Kelola Pengguna
@@ -232,7 +234,7 @@
                 {{-- Right Dropdown --}}
                 @auth
                 <div class="d-flex align-items-center gap-2">
-                  @if(Auth::user()->isDokter() || Auth::user()->isAdmin())
+                  @if(Auth::user()->isDokter() || Auth::user()->isAdminRs())
                   <div class="dropdown">
                     <a class="btn btn-glass-emerald rounded-pill px-3 position-relative"
                        href="#" id="dropdownNotif" data-bs-toggle="dropdown" aria-expanded="false">
@@ -274,8 +276,8 @@
                     </a>
                     <ul class="dropdown-menu dropdown-menu-end shadow">
                       <li class="px-3 py-2 small text-muted">
-                        <div class="fw-semibold">{{ ucfirst(Auth::user()->role) }}</div>
-                        <div>RS {{ Auth::user()->rumahSakit->nama ?? '-' }}</div>
+                        <div class="fw-semibold">{{ Auth::user()->role_label }}</div>
+                        <div>{{ Auth::user()->rumahSakit ? 'RS '.Auth::user()->rumahSakit->nama : 'Platform' }}</div>
                       </li>
                       <li><hr class="dropdown-divider"></li>
                       <li><a class="dropdown-item" href="{{ route('profile.edit') }}"><i class="fas fa-id-card me-2"></i> Profil</a></li>

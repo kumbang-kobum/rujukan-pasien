@@ -21,13 +21,24 @@ class UserSeeder extends Seeder
             ['alamat' => 'Jl. Contoh No.2, Kota B', 'telepon' => '021-7654321']
         );
 
-        // Admin
+        // Super admin platform
+        User::updateOrCreate(
+            ['email' => 'superadmin@example.com'],
+            [
+                'name' => 'Super Admin Platform',
+                'password' => Hash::make('password'),
+                'role' => User::ROLE_SUPER_ADMIN,
+                'rumah_sakit_id' => null,
+            ]
+        );
+
+        // Admin rumah sakit
         User::updateOrCreate(
             ['email' => 'admin.rsa@example.com'],
             [
                 'name' => 'Admin RSA',
                 'password' => Hash::make('password'),
-                'role' => 'admin',
+                'role' => User::ROLE_ADMIN_RS,
                 'rumah_sakit_id' => $rsa->id
             ]
         );
@@ -37,7 +48,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'Admin RSB',
                 'password' => Hash::make('password'),
-                'role' => 'admin',
+                'role' => User::ROLE_ADMIN_RS,
                 'rumah_sakit_id' => $rsb->id
             ]
         );
@@ -48,7 +59,7 @@ class UserSeeder extends Seeder
             [
                 'name' => 'dr. RSA',
                 'password' => Hash::make('password'),
-                'role' => 'dokter',
+                'role' => User::ROLE_DOKTER,
                 'rumah_sakit_id' => $rsa->id
             ]
         );
@@ -58,18 +69,18 @@ class UserSeeder extends Seeder
             [
                 'name' => 'dr. RSB',
                 'password' => Hash::make('password'),
-                'role' => 'dokter',
+                'role' => User::ROLE_DOKTER,
                 'rumah_sakit_id' => $rsb->id
             ]
         );
 
-        // Perawat
+        // Petugas
         User::updateOrCreate(
             ['email' => 'perawat.rsa@example.com'],
             [
-                'name' => 'Perawat RSA',
+                'name' => 'Petugas RSA',
                 'password' => Hash::make('password'),
-                'role' => 'perawat',
+                'role' => User::ROLE_PETUGAS,
                 'rumah_sakit_id' => $rsa->id
             ]
         );
@@ -77,9 +88,9 @@ class UserSeeder extends Seeder
         User::updateOrCreate(
             ['email' => 'perawat.rsb@example.com'],
             [
-                'name' => 'Perawat RSB',
+                'name' => 'Petugas RSB',
                 'password' => Hash::make('password'),
-                'role' => 'perawat',
+                'role' => User::ROLE_PETUGAS,
                 'rumah_sakit_id' => $rsb->id
             ]
         );

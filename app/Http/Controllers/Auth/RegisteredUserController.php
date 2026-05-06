@@ -40,7 +40,7 @@ class RegisteredUserController extends Controller
             'name' => $request->name,
             'email' => $request->email,
             'password' => Hash::make($request->password),
-            'role' => 'dokter',
+            'role' => User::ROLE_DOKTER,
             'rumah_sakit_id' => RumahSakit::query()->value('id')
                 ?? RumahSakit::create([
                     'nama' => 'RS Default',

@@ -284,7 +284,7 @@ class SOAPController extends Controller
 
     public function destroy(SOAP $soap)
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
+        abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $soap->delete();
         return redirect()->route('soap.index')->with('success','SOAP dihapus.');
     }

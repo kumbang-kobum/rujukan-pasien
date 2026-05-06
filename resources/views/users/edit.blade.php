@@ -56,7 +56,10 @@
 
       <div class="mb-3">
         <label class="form-label">Rumah Sakit</label>
-        <select name="rumah_sakit_id" class="form-select @error('rumah_sakit_id') is-invalid @enderror" required>
+        <select name="rumah_sakit_id" class="form-select @error('rumah_sakit_id') is-invalid @enderror">
+          @if(auth()->user()->isSuperAdmin())
+            <option value="">Platform / tidak terikat RS</option>
+          @endif
           @foreach($rsList as $rs)
             <option value="{{ $rs->id }}" {{ (int)old('rumah_sakit_id', $user->rumah_sakit_id) === (int)$rs->id ? 'selected' : '' }}>
               {{ $rs->nama }}
@@ -69,10 +72,11 @@
       <div class="mb-3">
         <label class="form-label">Role</label>
         <select name="role" class="form-select" required>
-          <option value="admin" {{ $user->role == 'admin' ? 'selected' : '' }}>Admin</option>
-          <option value="dokter" {{ $user->role == 'dokter' ? 'selected' : '' }}>Dokter</option>
-          <option value="perawat" {{ $user->role == 'perawat' ? 'selected' : '' }}>Perawat</option>
+          @foreach($roleOptions as $value => $label)
+            <option value="{{ $value }}" {{ old('role', $user->role) === $value ? 'selected' : '' }}>{{ $label }}</option>
+          @endforeach
         </select>
+        @error('role') <div class="text-danger small">{{ $message }}</div> @enderror
       </div>
 
       <button class="btn btn-warning"><i class="fas fa-save"></i> Update</button>

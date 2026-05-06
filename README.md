@@ -35,6 +35,7 @@ https://github.com/kumbang-kobum/rujukan-pasien.git
 
 Jika menjalankan `php artisan migrate --seed`, aplikasi membuat akun contoh:
 
+- `superadmin@example.com`
 - `admin.rsa@example.com`
 - `admin.rsb@example.com`
 - `dokter.rsa@example.com`
@@ -50,6 +51,13 @@ password
 
 Ganti password setelah login, terutama jika data ini pernah dipakai di server
 online.
+
+Role awal:
+
+- `superadmin@example.com`: Super Admin platform, untuk mengelola master rumah sakit dan seluruh akun.
+- `admin.rsa@example.com` / `admin.rsb@example.com`: Admin RS, hanya mengelola akun pada rumah sakit masing-masing.
+- `dokter.*`: Dokter RS.
+- `perawat.*`: Petugas RS. Email lama tetap dipakai supaya data contoh lama tidak membingungkan, tetapi role aplikasinya sekarang `petugas`.
 
 ## Setup Development di macOS dengan MySQL XAMPP
 

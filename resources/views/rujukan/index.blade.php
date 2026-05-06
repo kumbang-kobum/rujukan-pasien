@@ -194,7 +194,7 @@
                                 <a href="{{ route('rujukan.edit',$r->id) }}" class="btn btn-warning btn-sm">Edit</a>
 
                                 {{-- Hanya ADMIN yang boleh menghapus --}}
-                                @if(auth()->check() && auth()->user()->role === 'admin')
+                                @if(auth()->check() && auth()->user()->isAdmin())
                                     <form action="{{ route('rujukan.destroy',$r->id) }}" method="POST" class="d-inline"
                                           onsubmit="return confirm('Yakin hapus rujukan ini? Tindakan tidak bisa dibatalkan.')">
                                         @csrf @method('DELETE')

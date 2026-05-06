@@ -32,10 +32,13 @@ Route::get('/berkas/file/{filename}', function ($filename) {
 
 Route::middleware(['auth'])->group(function () {
 
-    // ADMIN ONLY
-    Route::middleware('role:admin')->group(function () {
-        // Admin
+    // Super admin platform
+    Route::middleware('role:super_admin')->group(function () {
         Route::resource('rumahsakit', RumahSakitController::class)->names('rumahsakit');
+    });
+
+    // Super admin dan admin RS
+    Route::middleware('role:super_admin,admin_rs')->group(function () {
         Route::resource('users', UserController::class)->except(['show']);
         Route::get('/admin/password', [AdminController::class, 'editPassword'])->name('admin.password.edit');
         Route::post('/admin/password', [AdminController::class, 'updatePassword'])->name('admin.password.update');
@@ -56,7 +59,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/ajax/dokter-by-rs/{rs}', [AjaxRujukanController::class, 'dokterByRs'])
             ->name('ajax.dokter-by-rs');
 
-    Route::resource('users', UserController::class);
     Route::resource('pasien', PasienController::class);
     Route::resource('soap', SOAPController::class);
     Route::resource('rujukan', RujukanController::class);

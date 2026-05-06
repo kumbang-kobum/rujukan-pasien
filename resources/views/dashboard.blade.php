@@ -13,6 +13,15 @@
     $seriesRujukan    = array_values(array_replace(array_fill(1, 12, 0), $rujukanPerBulan));
 
     $tahun = date('Y');
+    $currentUser = Auth::user();
+    $rujukanKirimLabel = $currentUser->isSuperAdmin() ? 'Total Rujukan' : 'Rujukan Dikirim';
+    $rujukanKirimCount = $currentUser->isSuperAdmin()
+        ? \App\Models\Rujukan::count()
+        : \App\Models\Rujukan::where('rumah_sakit_asal_id', $currentUser->rumah_sakit_id)->count();
+    $rujukanTerimaLabel = $currentUser->isSuperAdmin() ? 'Total Rumah Sakit' : 'Rujukan Diterima';
+    $rujukanTerimaCount = $currentUser->isSuperAdmin()
+        ? \App\Models\RumahSakit::count()
+        : \App\Models\Rujukan::where('rumah_sakit_tujuan_id', $currentUser->rumah_sakit_id)->count();
 @endphp
 
 {{-- STYLE KHUSUS DASHBOARD --}}
@@ -64,10 +73,8 @@
       <div class="card metric grad-green text-white h-100">
         <div class="card-body p-4 d-flex align-items-center justify-content-between">
           <div>
-            <div class="cap">Rujukan Dikirim</div>
-            <div class="value mt-1">
-              {{ \App\Models\Rujukan::where('rumah_sakit_asal_id', Auth::user()->rumah_sakit_id)->count() }}
-            </div>
+            <div class="cap">{{ $rujukanKirimLabel }}</div>
+            <div class="value mt-1">{{ $rujukanKirimCount }}</div>
           </div>
           <div class="qicon bg-white" style="color:#15803d"><i class="fas fa-paper-plane fa-lg"></i></div>
         </div>
@@ -78,10 +85,8 @@
       <div class="card metric grad-amber text-white h-100">
         <div class="card-body p-4 d-flex align-items-center justify-content-between">
           <div>
-            <div class="cap">Rujukan Diterima</div>
-            <div class="value mt-1">
-              {{ \App\Models\Rujukan::where('rumah_sakit_tujuan_id', Auth::user()->rumah_sakit_id)->count() }}
-            </div>
+            <div class="cap">{{ $rujukanTerimaLabel }}</div>
+            <div class="value mt-1">{{ $rujukanTerimaCount }}</div>
           </div>
           <div class="qicon bg-white" style="color:#b45309"><i class="fas fa-inbox fa-lg"></i></div>
         </div>
@@ -94,7 +99,7 @@
     <h5 class="section-title mb-3"><i class="fas fa-folder-open me-2 text-warning"></i>Menu Utama</h5>
     <div class="row g-3">
 
-      @if(Auth::user()->isDokter() || Auth::user()->isPerawat() || Auth::user()->isAdmin())
+      @if(Auth::user()->canAccessClinical())
       <div class="col-md-6">
         <a href="{{ route('pasien.index') }}" class="text-decoration-none text-reset">
           <div class="qcard p-3 d-flex align-items-center h-100">
@@ -119,7 +124,7 @@
       </div>
       @endif
 
-      @if(Auth::user()->isAdmin())
+      @if(Auth::user()->canManageHospitals())
       <div class="col-md-6">
         <a href="{{ route('rumahsakit.index') }}" class="text-decoration-none text-reset">
           <div class="qcard p-3 d-flex align-items-center h-100">
@@ -131,6 +136,9 @@
           </div>
         </a>
       </div>
+      @endif
+
+      @if(Auth::user()->canManageUsers())
       <div class="col-md-6">
         <a href="{{ route('users.index') }}" class="text-decoration-none text-reset">
           <div class="qcard p-3 d-flex align-items-center h-100">

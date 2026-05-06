@@ -119,12 +119,12 @@ class KonsultasiFeatureTest extends TestCase
         $rsTujuan = RumahSakit::factory()->create(['nama' => 'RS Tujuan']);
 
         $dokterAsal = User::factory()->create([
-            'role' => 'dokter',
+            'role' => User::ROLE_DOKTER,
             'rumah_sakit_id' => $rsAsal->id,
         ]);
 
         $dokterTujuan = User::factory()->create([
-            'role' => 'dokter',
+            'role' => User::ROLE_DOKTER,
             'rumah_sakit_id' => $rsTujuan->id,
         ]);
 
@@ -145,7 +145,6 @@ class KonsultasiFeatureTest extends TestCase
             'dokter_id' => $dokterAsal->id,
             'user_id' => $dokterAsal->id,
             'rumah_sakit_id' => $rsAsal->id,
-            'poli' => 'Rawat Jalan',
             'rajalranap' => 'Rawat Jalan',
             'tanggal_kunjungan' => now()->toDateString(),
             'waktu_masuk' => now()->format('Y-m-d H:i:s'),

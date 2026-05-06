@@ -146,7 +146,7 @@
                             <a href="{{ route('pasien.edit',$p->id) }}" class="btn btn-sm btn-warning">Edit</a>
 
                             {{-- Hanya admin yang boleh hapus --}}
-                            @if(auth()->check() && auth()->user()->role === 'admin')
+                            @if(auth()->check() && auth()->user()->isAdmin())
                                 <form action="{{ route('pasien.destroy',$p->id) }}" method="POST" class="d-inline"
                                       onsubmit="return confirm('Yakin hapus pasien ini? Tindakan tidak bisa dibatalkan.')">
                                     @csrf @method('DELETE')

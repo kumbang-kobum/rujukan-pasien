@@ -18,7 +18,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         Gate::before(function (User $user, $ability) {
-            return $user->isAdmin() ? true : null;
+            return $user->isSuperAdmin() ? true : null;
         });
 
         View::composer('layouts.app', function ($view) {

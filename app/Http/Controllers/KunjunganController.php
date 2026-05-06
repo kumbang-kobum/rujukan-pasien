@@ -163,7 +163,7 @@ class KunjunganController extends Controller
 
     public function destroy(Kunjungan $kunjungan)
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
+        abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $kunjungan->delete();
         return redirect()->route('kunjungan.index')->with('success','Kunjungan dihapus.');
     }

@@ -54,7 +54,7 @@
             <a href="{{ route('kunjungan.edit',$kunjungan->id) }}" class="btn btn-warning btn-sm">
                 <i class="fas fa-edit"></i> Edit
             </a>
-            @if(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdmin()))
+            @if(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdminRs()))
                 <a href="{{ route('konsultasi.create', ['kunjungan_id' => $kunjungan->id]) }}" class="btn btn-info btn-sm">
                     <i class="fas fa-comment-medical"></i> Konsultasi
                 </a>

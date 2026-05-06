@@ -18,7 +18,7 @@ class RujukanController extends Controller
     private function assertViewable(Rujukan $rujukan): void
     {
         $user = auth()->user();
-        if ($user->role === 'admin') return;
+        if ($user->isSuperAdmin()) return;
     
         $rsId = (int) $user->rumah_sakit_id;
         abort_unless(
@@ -32,7 +32,7 @@ class RujukanController extends Controller
     {
         $user = auth()->user();
         abort_unless(
-            $user->role === 'admin'
+            $user->isSuperAdmin()
             || (int)$user->rumah_sakit_id === (int)$rujukan->rumah_sakit_asal_id
             || (int)$user->rumah_sakit_id === (int)$rujukan->rumah_sakit_tujuan_id,
             403
@@ -298,7 +298,7 @@ class RujukanController extends Controller
     public function destroy(Rujukan $rujukan)
     {
         $this->assertViewable($rujukan);
-        abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
+        abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $rujukan->delete();
         
         return back()->with('success','Rujukan dihapus.');

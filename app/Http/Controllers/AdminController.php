@@ -10,7 +10,7 @@ class AdminController extends Controller
 {
     public function __construct()
     {
-        $this->middleware(['auth','role:admin']);
+        $this->middleware(['auth','role:super_admin,admin_rs']);
     }
 
     // (Opsional) Halaman ringkas admin

@@ -105,7 +105,7 @@
                             <a href="{{ route('kunjungan.edit', $k->id) }}" class="btn btn-warning btn-sm">Edit</a>
 
                             {{-- Hanya admin yang boleh menghapus --}}
-                            @if(auth()->check() && auth()->user()->role === 'admin')
+                            @if(auth()->check() && auth()->user()->isAdmin())
                                 <form action="{{ route('kunjungan.destroy', $k->id) }}" method="POST" class="d-inline"
                                       onsubmit="return confirm('Hapus kunjungan ini? Tindakan tidak bisa dibatalkan.')">
                                     @csrf @method('DELETE')

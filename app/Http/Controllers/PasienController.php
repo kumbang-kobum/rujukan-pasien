@@ -118,7 +118,7 @@ class PasienController extends Controller
 
     public function destroy(Pasien $pasien)
     {
-        abort_unless(auth()->check() && auth()->user()->role === 'admin', 403);
+        abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $pasien->delete();
         return redirect()->route('pasien.index')->with('success', '🗑️ Pasien berhasil dihapus.');
     }
