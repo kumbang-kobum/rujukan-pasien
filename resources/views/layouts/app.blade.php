@@ -182,51 +182,99 @@
                     </li>
 
                     @php
-                        $canSeeClinical = Auth::user()->canAccessClinical();
+                        $currentUser = Auth::user();
+                        $canSeeClinical = $currentUser->canAccessClinical();
+                        $canSeeConsultation = $currentUser->isDokter() || $currentUser->isAdminRs();
+                        $isClinicalActive = request()->routeIs('pasien.*')
+                            || request()->routeIs('kunjungan.*')
+                            || request()->routeIs('soap.*')
+                            || request()->routeIs('rujukan.*')
+                            || request()->routeIs('konsultasi.*');
+                        $isAdminRsActive = request()->routeIs('users.*') || request()->routeIs('admin.password.*');
+                        $isPlatformActive = request()->routeIs('rumahsakit.*')
+                            || ($currentUser->isSuperAdmin() && request()->routeIs('users.*'));
                     @endphp
 
                     @if($canSeeClinical)
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('pasien.*') ? 'active' : '' }}" href="{{ route('pasien.index') }}">
-                                <i class="fas fa-user-injured me-1"></i> Pasien
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle {{ $isClinicalActive ? 'active' : '' }}" href="#" id="menuPelayananRs" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-briefcase-medical me-1"></i> Pelayanan RS
                             </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="menuPelayananRs">
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('pasien.*') ? 'active' : '' }}" href="{{ route('pasien.index') }}">
+                                        <i class="fas fa-user-injured me-2"></i> Pasien
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('kunjungan.*') ? 'active' : '' }}" href="{{ route('kunjungan.index') }}">
+                                        <i class="fas fa-stethoscope me-2"></i> Kunjungan
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('soap.*') ? 'active' : '' }}" href="{{ route('soap.index') }}">
+                                        <i class="fas fa-file-medical me-2"></i> SOAP
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('rujukan.*') ? 'active' : '' }}" href="{{ route('rujukan.index') }}">
+                                        <i class="fas fa-exchange-alt me-2"></i> Rujukan
+                                    </a>
+                                </li>
+                                @if($canSeeConsultation)
+                                    <li><hr class="dropdown-divider"></li>
+                                    <li>
+                                        <a class="dropdown-item {{ request()->routeIs('konsultasi.*') ? 'active' : '' }}" href="{{ route('konsultasi.index') }}">
+                                            <i class="fas fa-comment-medical me-2"></i> Konsultasi Dokter
+                                        </a>
+                                    </li>
+                                @endif
+                            </ul>
                         </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('kunjungan.*') ? 'active' : '' }}" href="{{ route('kunjungan.index') }}">
-                                <i class="fas fa-stethoscope me-1"></i> Kunjungan
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('soap.*') ? 'active' : '' }}" href="{{ route('soap.index') }}">
-                                <i class="fas fa-file-medical me-1"></i> SOAP
-                            </a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('rujukan.*') ? 'active' : '' }}" href="{{ route('rujukan.index') }}">
-                                <i class="fas fa-exchange-alt me-1"></i> Rujukan
-                            </a>
-                        </li>
-                        @if(Auth::user()->isDokter() || Auth::user()->isAdminRs())
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('konsultasi.*') ? 'active' : '' }}" href="{{ route('konsultasi.index') }}">
-                                <i class="fas fa-comment-medical me-1"></i> Konsultasi Antar Dokter
-                            </a>
-                        </li>
-                        @endif
                     @endif
 
-                    @if(Auth::user()->canManageHospitals())
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('rumahsakit.*') ? 'active' : '' }}" href="{{ route('rumahsakit.index') }}">
-                                <i class="fas fa-hospital me-1"></i> Kelola Rumah Sakit
+                    @if($currentUser->isAdminRs())
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle {{ $isAdminRsActive ? 'active' : '' }}" href="#" id="menuAdminRs" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-user-shield me-1"></i> Administrasi RS
                             </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="menuAdminRs">
+                                <li class="px-3 py-2 small text-muted">
+                                    <div class="fw-semibold">{{ $currentUser->rumahSakit->nama ?? 'Rumah sakit saya' }}</div>
+                                    <div>Kelola pengguna internal RS</div>
+                                </li>
+                                <li><hr class="dropdown-divider"></li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
+                                        <i class="fas fa-users me-2"></i> Pengguna RS
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('admin.password.*') ? 'active' : '' }}" href="{{ route('admin.password.edit') }}">
+                                        <i class="fas fa-key me-2"></i> Password Admin
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     @endif
-                    @if(Auth::user()->canManageUsers())
-                        <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
-                                <i class="fas fa-users me-1"></i> Kelola Pengguna
+
+                    @if($currentUser->isSuperAdmin())
+                        <li class="nav-item dropdown">
+                            <a class="nav-link dropdown-toggle {{ $isPlatformActive ? 'active' : '' }}" href="#" id="menuPlatform" role="button" data-bs-toggle="dropdown" aria-expanded="false">
+                                <i class="fas fa-network-wired me-1"></i> Platform
                             </a>
+                            <ul class="dropdown-menu shadow" aria-labelledby="menuPlatform">
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('rumahsakit.*') ? 'active' : '' }}" href="{{ route('rumahsakit.index') }}">
+                                        <i class="fas fa-hospital me-2"></i> Master Rumah Sakit
+                                    </a>
+                                </li>
+                                <li>
+                                    <a class="dropdown-item {{ request()->routeIs('users.*') ? 'active' : '' }}" href="{{ route('users.index') }}">
+                                        <i class="fas fa-users-cog me-2"></i> Pengguna Platform
+                                    </a>
+                                </li>
+                            </ul>
                         </li>
                     @endif
                 </ul>

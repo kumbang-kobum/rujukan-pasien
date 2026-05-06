@@ -29,7 +29,8 @@ https://github.com/kumbang-kobum/rujukan-pasien.git
 - `resources/views`: Blade template
 - `routes/web.php`: route web aplikasi
 - `public`: document root web server
-- `storage/app/public`: file upload yang dipublikasikan lewat `php artisan storage:link`
+- `storage/app/private/berkas`: penyimpanan private untuk berkas medis
+- `storage/app/public`: file publik non-medis dan fallback file lama
 
 ## Akun Awal Seeder
 
@@ -484,9 +485,17 @@ Jalankan migrasi dan refresh cache:
 
 ```bash
 php artisan migrate --force
+php artisan berkas:migrate-private
 php artisan optimize:clear
 php artisan config:cache
 php artisan view:cache
+```
+
+Jika command `berkas:migrate-private` menampilkan file lama yang akan
+dipindahkan dan backup sudah aman, jalankan:
+
+```bash
+php artisan berkas:migrate-private --execute
 ```
 
 Catatan: jangan jalankan `php artisan route:cache` dulu selama `routes/web.php`
@@ -543,6 +552,30 @@ Setelah import:
 php artisan migrate
 php artisan optimize:clear
 ```
+
+## Migrasi Berkas Medis Lama ke Private Storage
+
+Mulai tahap pengamanan berkas medis, upload baru disimpan di
+`storage/app/private/berkas` dan hanya dibuka lewat route yang wajib login.
+Jika sebelumnya ada file lama di `storage/app/public/berkas`, pindahkan ke
+private storage dengan command berikut.
+
+Cek dulu tanpa memindahkan file:
+
+```bash
+php artisan berkas:migrate-private
+```
+
+Jika hasil simulasi sudah sesuai, jalankan migrasi:
+
+```bash
+php artisan berkas:migrate-private --execute
+```
+
+Command ini tidak mengubah nilai `path` di database. File dengan path yang sama
+dipindahkan dari disk public ke disk private, lalu salinan public dihapus. Jika
+file private sudah ada dan masih ada duplikat di public, duplikat public ikut
+dihapus saat memakai `--execute`.
 
 ## Troubleshooting
 

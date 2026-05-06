@@ -4,24 +4,7 @@
 
 @section('content')
 @php
-    // Jaga-jaga: pastikan variabel ada
-    $pasienPerBulan   = $pasienPerBulan   ?? [];
-    $rujukanPerBulan  = $rujukanPerBulan  ?? [];
-
-    // Buat 12 elemen (bulan 1..12) lalu reindex ke [0..11]
-    $seriesPasien     = array_values(array_replace(array_fill(1, 12, 0), $pasienPerBulan));
-    $seriesRujukan    = array_values(array_replace(array_fill(1, 12, 0), $rujukanPerBulan));
-
-    $tahun = date('Y');
     $currentUser = Auth::user();
-    $rujukanKirimLabel = $currentUser->isSuperAdmin() ? 'Total Rujukan' : 'Rujukan Dikirim';
-    $rujukanKirimCount = $currentUser->isSuperAdmin()
-        ? \App\Models\Rujukan::count()
-        : \App\Models\Rujukan::where('rumah_sakit_asal_id', $currentUser->rumah_sakit_id)->count();
-    $rujukanTerimaLabel = $currentUser->isSuperAdmin() ? 'Total Rumah Sakit' : 'Rujukan Diterima';
-    $rujukanTerimaCount = $currentUser->isSuperAdmin()
-        ? \App\Models\RumahSakit::count()
-        : \App\Models\Rujukan::where('rumah_sakit_tujuan_id', $currentUser->rumah_sakit_id)->count();
 @endphp
 
 {{-- STYLE KHUSUS DASHBOARD --}}
@@ -43,15 +26,19 @@
   .qicon.purple{background:#efe7ff;color:#6d28d9}
   .qicon.gray{background:#f0f2f5;color:#374151}
   .section-title{font-weight:700}
+  .scope-pill{border:1px solid #dbeafe;background:#eff6ff;color:#1d4ed8;border-radius:999px;padding:.35rem .75rem;font-size:.875rem}
 </style>
 
 <div class="container">
 
   {{-- HERO --}}
-  <div class="d-flex align-items-center justify-content-between mb-4">
+  <div class="d-flex flex-wrap align-items-center justify-content-between gap-3 mb-4">
     <div>
       <h1 class="hero-title mb-1"><i class="fas fa-hospital-user me-2 text-primary"></i>Dashboard</h1>
       <div class="text-muted">Ringkasan aktivitas & statistik {{ $tahun }}</div>
+    </div>
+    <div class="scope-pill">
+      <i class="fas fa-shield-alt me-1"></i> {{ $scopeLabel }}
     </div>
   </div>
 
@@ -61,8 +48,8 @@
       <div class="card metric grad-blue text-white h-100">
         <div class="card-body p-4 d-flex align-items-center justify-content-between">
           <div>
-            <div class="cap">Total Pasien</div>
-            <div class="value mt-1">{{ \App\Models\Pasien::count() }}</div>
+            <div class="cap">{{ $currentUser->isSuperAdmin() ? 'Total Pasien' : 'Pasien RS Saya' }}</div>
+            <div class="value mt-1">{{ $pasienCount }}</div>
           </div>
           <div class="qicon bg-white" style="color:#1d4ed8"><i class="fas fa-user-injured fa-lg"></i></div>
         </div>
@@ -166,11 +153,14 @@
 </div>
 @endsection
 
+@push('scripts')
 {{-- Script Chart.js --}}
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
   (function () {
-    const ctx = document.getElementById('chartPasienRujukan').getContext('2d');
+    const canvas = document.getElementById('chartPasienRujukan');
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
 
     // Gradien lembut untuk area
     const gradBlue  = ctx.createLinearGradient(0, 0, 0, 240);
@@ -238,3 +228,4 @@
     });
   })();
 </script>
+@endpush
