@@ -14,9 +14,24 @@ use PDF;
 
 class SOAPController extends Controller
 {
+    private function authorizeView(SOAP $soap): void
+    {
+        abort_unless(
+            SOAP::query()->visibleTo(Auth::user())->whereKey($soap->id)->exists(),
+            403
+        );
+    }
+
+    private function visibleKunjunganQuery()
+    {
+        return Kunjungan::query()->visibleTo(Auth::user());
+    }
+
     public function index(Request $request)
     {
-        $q = SOAP::query()->with(['kunjungan.pasien','kunjungan.dokter','user']);
+        $q = SOAP::query()
+            ->visibleTo($request->user())
+            ->with(['kunjungan.pasien','kunjungan.dokter','user']);
 
         // Keyword: cari di no_rawat, no_rkm_medis, nama pasien, serta isi SOAP
         if ($kw = trim($request->input('keyword', ''))) {
@@ -61,13 +76,17 @@ class SOAPController extends Controller
         $soap = $q->paginate($perPage)->withQueryString();
 
         // Untuk dropdown "User Input"
-        $users = User::orderBy('name')->get(['id','name']);
+        $users = User::where('rumah_sakit_id', $request->user()->rumah_sakit_id)
+            ->orderBy('name')
+            ->get(['id','name']);
 
         return view('soap.index', ['soap' => $soap, 'users' => $users]);
     }
 
     public function cetak(SOAP $soap)
     {
+        $this->authorizeView($soap);
+
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
 
         $pdf = PDF::loadView('soap.cetak', compact('soap'))
@@ -78,7 +97,8 @@ class SOAPController extends Controller
 
     public function create()
     {
-        $kunjungan = Kunjungan::with('pasien')
+        $kunjungan = $this->visibleKunjunganQuery()
+            ->with('pasien')
             ->whereDate('tanggal_kunjungan', now()->toDateString())
             ->where('status_pulang', 0)
             ->get();
@@ -105,6 +125,8 @@ class SOAPController extends Controller
             'lampiran_kategori'         => 'array',
             'lampiran_kategori.*'       => 'nullable|in:USG,LAB,LAIN',
         ]);
+
+        $kunjungan = $this->visibleKunjunganQuery()->findOrFail($request->integer('kunjungan_id'));
     
         // Hitung MAP jika diisi
         $calcMap = null;
@@ -114,7 +136,7 @@ class SOAPController extends Controller
     
         // Buat SOAP & simpan ke variabel
         $soap = SOAP::create([
-            'kunjungan_id' => $request->kunjungan_id,
+            'kunjungan_id' => $kunjungan->id,
             'user_id'      => Auth::id(),
             'subjektif'    => $request->subjektif,
             'objektif'     => $request->objektif,
@@ -154,6 +176,8 @@ class SOAPController extends Controller
 
     public function show(SOAP $soap)
     {
+        $this->authorizeView($soap);
+
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
     
         $berkasKunjungan = $soap->berkas()->with('uploader')->latest()->get();
@@ -163,7 +187,10 @@ class SOAPController extends Controller
 
     public function edit(SOAP $soap)
     {
-        $kunjungan = Kunjungan::with('pasien')
+        $this->authorizeView($soap);
+
+        $kunjungan = $this->visibleKunjunganQuery()
+            ->with('pasien')
             ->whereDate('tanggal_kunjungan', now()->toDateString())
             ->where('status_pulang', 0)
             ->get();
@@ -179,6 +206,8 @@ class SOAPController extends Controller
 
     public function update(Request $request, SOAP $soap)
     {
+        $this->authorizeView($soap);
+
         $request->validate([
             'kunjungan_id' => 'required|exists:kunjungan,id',
             'subjektif'    => 'nullable|string',
@@ -202,6 +231,8 @@ class SOAPController extends Controller
             'lampiran_kategori'         => 'array',
             'lampiran_kategori.*'       => 'nullable|in:USG,LAB,LAIN',
         ]);
+
+        $kunjungan = $this->visibleKunjunganQuery()->findOrFail($request->integer('kunjungan_id'));
     
         // hitung MAP jika perlu
         $calcMap = null;
@@ -211,7 +242,7 @@ class SOAPController extends Controller
     
         // update data SOAP
         $soap->update([
-            'kunjungan_id' => $request->kunjungan_id,
+            'kunjungan_id' => $kunjungan->id,
             'subjektif'    => $request->subjektif,
             'objektif'     => $request->objektif,
             'assessment'   => $request->assessment,
@@ -284,6 +315,7 @@ class SOAPController extends Controller
 
     public function destroy(SOAP $soap)
     {
+        $this->authorizeView($soap);
         abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $soap->delete();
         return redirect()->route('soap.index')->with('success','SOAP dihapus.');

@@ -56,27 +56,31 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/dashboard', [DashboardController::class, 'index'])->name('dashboard');
 
-    Route::get('/ajax/dokter-by-rs/{rs}', [AjaxRujukanController::class, 'dokterByRs'])
+    Route::middleware('role:admin_rs,dokter,petugas')->group(function () {
+        Route::get('/ajax/dokter-by-rs/{rs}', [AjaxRujukanController::class, 'dokterByRs'])
             ->name('ajax.dokter-by-rs');
 
-    Route::resource('pasien', PasienController::class);
-    Route::resource('soap', SOAPController::class);
-    Route::resource('rujukan', RujukanController::class);
-    Route::resource('konsultasi', KonsultasiController::class);
-    Route::patch('/konsultasi/{konsultasi}/accept', [KonsultasiController::class, 'accept'])->name('konsultasi.accept');
-    Route::post('/konsultasi/{konsultasi}/reply', [KonsultasiController::class, 'reply'])->name('konsultasi.reply');
-    Route::patch('/konsultasi/{konsultasi}/close', [KonsultasiController::class, 'close'])->name('konsultasi.close');
-    Route::post('/konsultasi/{konsultasi}/escalate', [KonsultasiController::class, 'escalate'])->name('konsultasi.escalate');
-    Route::resource('berkas', BerkasMedisController::class);
+        Route::resource('pasien', PasienController::class);
+        Route::resource('soap', SOAPController::class);
+        Route::get('soap/{soap}/cetak', [SOAPController::class,'cetak'])->name('soap.cetak');
+        Route::resource('rujukan', RujukanController::class);
+        Route::patch('/rujukan/{rujukan}/status/{status}', [RujukanController::class,'ubahStatus'])->name('rujukan.ubahStatus');
+        Route::resource('berkas', BerkasMedisController::class)->except(['index']);
 
-    // Kunjungan routes
-    Route::get('soap/{soap}/cetak', [\App\Http\Controllers\SOAPController::class,'cetak'])->name('soap.cetak');
-    Route::patch('/kunjungan/{kunjungan}/pulangkan', [KunjunganController::class, 'pulangkan'])
-        ->name('kunjungan.pulangkan');
-    Route::get('kunjungan/cetak', [KunjunganController::class, 'cetak'])
-        ->name('kunjungan.cetak');
-    Route::resource('kunjungan', KunjunganController::class);
-    Route::patch('/rujukan/{rujukan}/status/{status}', [RujukanController::class,'ubahStatus'])->name('rujukan.ubahStatus');
+        Route::patch('/kunjungan/{kunjungan}/pulangkan', [KunjunganController::class, 'pulangkan'])
+            ->name('kunjungan.pulangkan');
+        Route::get('kunjungan/cetak', [KunjunganController::class, 'cetak'])
+            ->name('kunjungan.cetak');
+        Route::resource('kunjungan', KunjunganController::class);
+    });
+
+    Route::middleware('role:admin_rs,dokter')->group(function () {
+        Route::resource('konsultasi', KonsultasiController::class);
+        Route::patch('/konsultasi/{konsultasi}/accept', [KonsultasiController::class, 'accept'])->name('konsultasi.accept');
+        Route::post('/konsultasi/{konsultasi}/reply', [KonsultasiController::class, 'reply'])->name('konsultasi.reply');
+        Route::patch('/konsultasi/{konsultasi}/close', [KonsultasiController::class, 'close'])->name('konsultasi.close');
+        Route::post('/konsultasi/{konsultasi}/escalate', [KonsultasiController::class, 'escalate'])->name('konsultasi.escalate');
+    });
 
     // Default redirect setelah login
     Route::get('/', function () { 

@@ -4,15 +4,26 @@ namespace App\Http\Controllers;
 
 use App\Models\BerkasMedis;
 use App\Models\Kunjungan;
+use App\Models\SOAP;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Storage;
 
 class BerkasMedisController extends Controller
 {
+    private function authorizeBerkas(BerkasMedis $berkas): void
+    {
+        abort_unless(
+            BerkasMedis::query()->visibleTo(auth()->user())->whereKey($berkas->id)->exists(),
+            403
+        );
+    }
+
     public function create(Request $request)
     {
-        $kunjungan = Kunjungan::findOrFail((int)$request->get('kunjungan_id'));
+        $kunjungan = Kunjungan::query()
+            ->visibleTo($request->user())
+            ->findOrFail((int)$request->get('kunjungan_id'));
+
         $redirect  = $request->input('redirect');
         $soapId    = $request->input('soap_id');   // ⬅️
         return view('berkas.create', compact('kunjungan','redirect','soapId'));
@@ -27,12 +38,23 @@ class BerkasMedisController extends Controller
             'kategori'     => ['nullable','in:USG,LAB,LAIN'],
             'file'         => ['required','file','mimes:pdf,jpg,jpeg,png','max:4096'],
         ]);
+
+        $kunjungan = Kunjungan::query()
+            ->visibleTo($request->user())
+            ->findOrFail($request->integer('kunjungan_id'));
+
+        if ($request->filled('soap_id')) {
+            SOAP::query()
+                ->visibleTo($request->user())
+                ->where('kunjungan_id', $kunjungan->id)
+                ->findOrFail($request->integer('soap_id'));
+        }
     
         $file = $request->file('file');
         $path = $file->store('berkas','public');
     
         BerkasMedis::create([
-            'kunjungan_id' => $request->kunjungan_id,
+            'kunjungan_id' => $kunjungan->id,
             'soap_id'      => $request->soap_id,     // ⬅️ kaitkan ke SOAP ini
             'uploader_id'  => auth()->id(),
             'jenis'        => $request->jenis,
@@ -48,12 +70,16 @@ class BerkasMedisController extends Controller
     
     public function edit(BerkasMedis $berka)
     {
+        $this->authorizeBerkas($berka);
+
         $redirect = request('redirect'); // <— opsional
         return view('berkas.edit', compact('berka','redirect'));
     }
     
     public function update(Request $request, BerkasMedis $berka)
     {
+        $this->authorizeBerkas($berka);
+
         $request->validate([
             'jenis' => ['nullable','string','max:100'],
             'file'  => ['nullable','file','mimes:pdf,jpg,jpeg,png','max:2048'],
@@ -61,8 +87,8 @@ class BerkasMedisController extends Controller
     
         $data = ['jenis' => $request->jenis];
         if ($request->hasFile('file')) {
-            if ($berka->path && \Storage::disk('public')->exists($berka->path)) {
-                \Storage::disk('public')->delete($berka->path);
+            if ($berka->path && Storage::disk('public')->exists($berka->path)) {
+                Storage::disk('public')->delete($berka->path);
             }
             $file = $request->file('file');
             $data['nama_file'] = $file->getClientOriginalName();
@@ -77,15 +103,16 @@ class BerkasMedisController extends Controller
     
     public function destroy(BerkasMedis $berka)
     {
-        if ($berka->path && \Storage::disk('public')->exists($berka->path)) {
-            \Storage::disk('public')->delete($berka->path);
+        $this->authorizeBerkas($berka);
+
+        if ($berka->path && Storage::disk('public')->exists($berka->path)) {
+            Storage::disk('public')->delete($berka->path);
         }
-        $back = request('redirect'); // bisa datang dari query ?redirect=...
         $idKunj = $berka->kunjungan_id;
         $berka->delete();
     
         $redirect = request('redirect'); // <— tambahkan
-        return redirect()->to($redirect ?: route('kunjungan.show',$berka->kunjungan_id))
+        return redirect()->to($redirect ?: route('kunjungan.show',$idKunj))
             ->with('success','Berkas berhasil dihapus.');
     }
 
@@ -120,6 +147,8 @@ class BerkasMedisController extends Controller
 
     public function show(BerkasMedis $berka)
     {
+        $this->authorizeBerkas($berka);
+
         return view('berkas.show', compact('berka'));
     }
 

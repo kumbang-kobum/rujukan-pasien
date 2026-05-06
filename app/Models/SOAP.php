@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class SOAP extends Model
@@ -23,6 +24,17 @@ class SOAP extends Model
         'td_dia',
         'map',
     ];
+
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->whereHas('kunjungan', function (Builder $kunjungan) use ($user) {
+            $kunjungan->where('rumah_sakit_id', $user->rumah_sakit_id);
+        });
+    }
 
     public function berkas()
     { 

@@ -56,12 +56,22 @@ class KonsultasiController extends Controller
         }
 
         if ($request->filled('arah')) {
-            if ($request->input('arah') === 'masuk') {
-                $query->where('dokter_tujuan_id', $user->id);
-            }
+            if ($user->isDokter()) {
+                if ($request->input('arah') === 'masuk') {
+                    $query->where('dokter_tujuan_id', $user->id);
+                }
 
-            if ($request->input('arah') === 'keluar') {
-                $query->where('dokter_pengirim_id', $user->id);
+                if ($request->input('arah') === 'keluar') {
+                    $query->where('dokter_pengirim_id', $user->id);
+                }
+            } elseif ($user->isAdminRs()) {
+                if ($request->input('arah') === 'masuk') {
+                    $query->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id);
+                }
+
+                if ($request->input('arah') === 'keluar') {
+                    $query->where('rumah_sakit_asal_id', $user->rumah_sakit_id);
+                }
             }
         }
 
@@ -78,6 +88,7 @@ class KonsultasiController extends Controller
     public function create(Request $request)
     {
         $this->ensureConsultationAccess();
+        $this->ensureDoctorActor();
 
         $user = auth()->user();
         $rsAsalId = (int) $user->rumah_sakit_id;
@@ -97,7 +108,7 @@ class KonsultasiController extends Controller
         $rumahSakitTujuan = RumahSakit::where('id', '!=', $rsAsalId)->orderBy('nama')->get();
         $dokterTujuan = collect();
         if (old('rumah_sakit_tujuan_id')) {
-            $dokterTujuan = User::where('role', 'dokter')
+            $dokterTujuan = User::where('role', User::ROLE_DOKTER)
                 ->where('rumah_sakit_id', old('rumah_sakit_tujuan_id'))
                 ->orderBy('name')
                 ->get(['id', 'name']);
@@ -122,6 +133,7 @@ class KonsultasiController extends Controller
     public function store(Request $request)
     {
         $this->ensureConsultationAccess();
+        $this->ensureDoctorActor();
 
         $isSubmit = $request->input('submit_action') === 'submit';
         $payload = $this->validatedPayload($request, $isSubmit);
@@ -245,7 +257,7 @@ class KonsultasiController extends Controller
             ->get();
 
         $rumahSakitTujuan = RumahSakit::where('id', '!=', $rsAsalId)->orderBy('nama')->get();
-        $dokterTujuan = User::where('role', 'dokter')
+        $dokterTujuan = User::where('role', User::ROLE_DOKTER)
             ->where('rumah_sakit_id', old('rumah_sakit_tujuan_id', $konsultasi->rumah_sakit_tujuan_id))
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -376,6 +388,7 @@ class KonsultasiController extends Controller
     {
         $this->ensureConsultationAccess();
         $this->assertViewable($konsultasi);
+        abort_unless($konsultasi->isSender(auth()->user()) || $konsultasi->isTarget(auth()->user()), 403);
         abort_unless($konsultasi->canReply(), 422, 'Konsultasi ini sudah tidak dapat dibalas.');
 
         $allowedTypes = auth()->id() === (int) $konsultasi->dokter_tujuan_id
@@ -436,6 +449,7 @@ class KonsultasiController extends Controller
     {
         $this->ensureConsultationAccess();
         $this->assertViewable($konsultasi);
+        abort_unless($konsultasi->isSender(auth()->user()) || $konsultasi->isTarget(auth()->user()), 403);
 
         abort_unless($konsultasi->status !== Konsultasi::STATUS_DRAFT, 422);
         abort_unless($konsultasi->status !== Konsultasi::STATUS_DIRUJUK, 422);
@@ -508,7 +522,7 @@ class KonsultasiController extends Controller
             'dokter_tujuan_id' => [
                 'required',
                 Rule::exists('users', 'id')->where(function ($query) use ($request) {
-                    $query->where('role', 'dokter')
+                    $query->where('role', User::ROLE_DOKTER)
                         ->where('rumah_sakit_id', $request->input('rumah_sakit_tujuan_id'));
                 }),
             ],
@@ -562,6 +576,7 @@ class KonsultasiController extends Controller
 
     private function assertKunjunganCanBeConsulted(Kunjungan $kunjungan): void
     {
+        abort_unless(auth()->user()->isDokter(), 403);
         abort_unless((int) $kunjungan->rumah_sakit_id === (int) auth()->user()->rumah_sakit_id, 403);
     }
 
@@ -577,6 +592,7 @@ class KonsultasiController extends Controller
 
     private function assertEditable(Konsultasi $konsultasi): void
     {
+        abort_unless(auth()->user()->isDokter(), 403);
         abort_unless($konsultasi->isSender(auth()->user()), 403);
         abort_unless($konsultasi->status === Konsultasi::STATUS_DRAFT, 422);
     }
@@ -584,12 +600,14 @@ class KonsultasiController extends Controller
     private function assertTargetActor(Konsultasi $konsultasi): void
     {
         $this->assertViewable($konsultasi);
+        abort_unless(auth()->user()->isDokter(), 403);
         abort_unless($konsultasi->isTarget(auth()->user()), 403);
     }
 
     private function assertSenderActor(Konsultasi $konsultasi): void
     {
         $this->assertViewable($konsultasi);
+        abort_unless(auth()->user()->isDokter(), 403);
         abort_unless($konsultasi->isSender(auth()->user()), 403);
     }
 
@@ -605,7 +623,12 @@ class KonsultasiController extends Controller
 
     private function ensureConsultationAccess(): void
     {
-        abort_unless(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdmin()), 403);
+        abort_unless(auth()->check() && (auth()->user()->isDokter() || auth()->user()->isAdminRs()), 403);
+    }
+
+    private function ensureDoctorActor(): void
+    {
+        abort_unless(auth()->check() && auth()->user()->isDokter(), 403);
     }
 
     private function notifyUser(?User $recipient, Konsultasi $konsultasi, string $eventType): void

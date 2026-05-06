@@ -112,7 +112,7 @@ class RujukanController extends Controller
         $rsList = RumahSakit::orderBy('nama')->get(['id','nama']);
         $dokterList = collect();
         if ($rsTujuan = $request->input('rs_tujuan_id')) {
-            $dokterList = User::where('role','dokter')
+            $dokterList = User::where('role', User::ROLE_DOKTER)
                 ->where('rumah_sakit_id', $rsTujuan)
                 ->orderBy('name')->get(['id','name']);
         }
@@ -123,7 +123,11 @@ class RujukanController extends Controller
     public function create()
     {
         // daftar kunjungan (silakan sesuaikan filter)
-        $kunjungan   = Kunjungan::with('pasien')->orderByDesc('tanggal_kunjungan')->get();
+        $kunjungan   = Kunjungan::query()
+            ->visibleTo(auth()->user())
+            ->with('pasien')
+            ->orderByDesc('tanggal_kunjungan')
+            ->get();
         $rsAsalId    = auth()->user()->rumah_sakit_id;
 
         // RS tujuan: exclude RS asal
@@ -146,13 +150,18 @@ class RujukanController extends Controller
         $rsAsalId = (int) auth()->user()->rumah_sakit_id;
     
         $request->validate([
-            'kunjungan_id'          => ['required', Rule::exists(Kunjungan::class, 'id')],
+            'kunjungan_id'          => [
+                'required',
+                Rule::exists('kunjungan', 'id')->where(function ($q) use ($rsAsalId) {
+                    $q->where('rumah_sakit_id', $rsAsalId);
+                }),
+            ],
             'rumah_sakit_asal_id'   => ['required', Rule::in([$rsAsalId])],
             'rumah_sakit_tujuan_id' => ['required', Rule::exists(RumahSakit::class, 'id'), 'different:rumah_sakit_asal_id'],
             'dokter_tujuan_id'      => [
                 'required',
                 Rule::exists(User::class,'id')->where(function ($q) use ($request) {
-                    $q->where('role','dokter')->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
+                    $q->where('role', User::ROLE_DOKTER)->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],
             // ⬇️ multi-pilih tembusan (opsional)
@@ -160,7 +169,7 @@ class RujukanController extends Controller
             'dokter_cc_ids.*'       => [
                 'integer','different:dokter_tujuan_id',
                 Rule::exists(User::class,'id')->where(function ($q) use ($request) {
-                    $q->where('role','dokter')->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
+                    $q->where('role', User::ROLE_DOKTER)->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],
             'alasan'                => ['required','string','max:255'],
@@ -202,12 +211,16 @@ class RujukanController extends Controller
         $this->assertViewable($rujukan);
         $this->assertManage($rujukan);
     
-        $kunjungan = Kunjungan::with('pasien')->orderByDesc('tanggal_kunjungan')->get();
+        $kunjungan = Kunjungan::query()
+            ->where('rumah_sakit_id', $rsAsalId)
+            ->with('pasien')
+            ->orderByDesc('tanggal_kunjungan')
+            ->get();
         $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
     
         $rumahSakitTujuan = RumahSakit::where('id','!=',$rsAsalId)->orderBy('nama')->get();
     
-        $dokter = User::where('role','dokter')
+        $dokter = User::where('role', User::ROLE_DOKTER)
             ->where('rumah_sakit_id', $rujukan->rumah_sakit_tujuan_id)
             ->orderBy('name')->get();
     
@@ -228,13 +241,18 @@ class RujukanController extends Controller
         $oldRsTujuan = (int) $rujukan->rumah_sakit_tujuan_id;
     
         $request->validate([
-            'kunjungan_id'          => ['required','exists:kunjungan,id'],
+            'kunjungan_id'          => [
+                'required',
+                Rule::exists('kunjungan', 'id')->where(function ($q) use ($rsAsalId) {
+                    $q->where('rumah_sakit_id', $rsAsalId);
+                }),
+            ],
             'rumah_sakit_asal_id'   => ['required','in:'.$rsAsalId],
             'rumah_sakit_tujuan_id' => ['required','exists:rumah_sakit,id','different:rumah_sakit_asal_id'],
             'dokter_tujuan_id'      => [
                 'required',
                 Rule::exists('users','id')->where(function ($q) use ($request) {
-                    $q->where('role','dokter')
+                    $q->where('role', User::ROLE_DOKTER)
                       ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],
@@ -243,7 +261,7 @@ class RujukanController extends Controller
             'dokter_cc_ids.*' => [
                 'integer','different:dokter_tujuan_id',
                 Rule::exists('users','id')->where(function ($q) use ($request) {
-                    $q->where('role','dokter')
+                    $q->where('role', User::ROLE_DOKTER)
                       ->where('rumah_sakit_id', $request->rumah_sakit_tujuan_id);
                 }),
             ],

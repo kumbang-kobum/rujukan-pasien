@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 
 class BerkasMedis extends Model
@@ -14,6 +15,17 @@ class BerkasMedis extends Model
     protected $fillable = [
         'kunjungan_id','soap_id','kategori','nama_file','path','mime','uploader_id'
     ];
+
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->whereHas('kunjungan', function (Builder $kunjungan) use ($user) {
+            $kunjungan->where('rumah_sakit_id', $user->rumah_sakit_id);
+        });
+    }
 
     public function soap()
     { 

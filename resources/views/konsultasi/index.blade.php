@@ -9,9 +9,11 @@
 <div class="card shadow-sm border-0">
     <div class="card-header bg-info text-white d-flex flex-wrap justify-content-between align-items-center gap-2">
         <span><i class="fas fa-comment-medical me-2"></i>Konsultasi Antar Dokter</span>
-        <a href="{{ route('konsultasi.create') }}" class="btn btn-light btn-sm">
-            <i class="fas fa-plus me-1"></i>Buat Konsultasi
-        </a>
+        @if(auth()->user()->isDokter())
+            <a href="{{ route('konsultasi.create') }}" class="btn btn-light btn-sm">
+                <i class="fas fa-plus me-1"></i>Buat Konsultasi
+            </a>
+        @endif
     </div>
     <div class="card-body">
         @if(session('success')) <div class="alert alert-success">{{ session('success') }}</div> @endif
@@ -37,8 +39,8 @@
                     <label class="form-label mb-1">Arah</label>
                     <select name="arah" class="form-select">
                         <option value="">Semua</option>
-                        <option value="keluar" @selected(request('arah') === 'keluar')>Saya kirim</option>
-                        <option value="masuk" @selected(request('arah') === 'masuk')>Untuk saya</option>
+                        <option value="keluar" @selected(request('arah') === 'keluar')>{{ auth()->user()->isAdminRs() ? 'Dikirim RS saya' : 'Saya kirim' }}</option>
+                        <option value="masuk" @selected(request('arah') === 'masuk')>{{ auth()->user()->isAdminRs() ? 'Masuk ke RS saya' : 'Untuk saya' }}</option>
                     </select>
                 </div>
                 <div class="col-md-2">
@@ -108,6 +110,11 @@
                                 <a href="{{ route('konsultasi.show', $item) }}" class="btn btn-info btn-sm">Buka</a>
                                 @if($item->status === \App\Models\Konsultasi::STATUS_DRAFT && (int) $item->dokter_pengirim_id === (int) auth()->id())
                                     <a href="{{ route('konsultasi.edit', $item) }}" class="btn btn-warning btn-sm">Edit</a>
+                                    <form method="POST" action="{{ route('konsultasi.destroy', $item) }}" class="d-inline" onsubmit="return confirm('Hapus draft konsultasi ini?')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button type="submit" class="btn btn-danger btn-sm">Hapus</button>
+                                    </form>
                                 @endif
                             </td>
                         </tr>

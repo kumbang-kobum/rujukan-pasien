@@ -9,6 +9,7 @@ use App\Models\Pasien;
 use App\Models\User;
 use App\Models\Rujukan;
 use App\Models\BerkasMedis;
+use Illuminate\Database\Eloquent\Builder;
 
 class Kunjungan extends Model
 {
@@ -36,6 +37,15 @@ class Kunjungan extends Model
         'waktu_pulang'      => 'datetime',
         'status_pulang'     => 'boolean',
     ];
+
+    public function scopeVisibleTo(Builder $query, User $user): Builder
+    {
+        if ($user->isSuperAdmin()) {
+            return $query;
+        }
+
+        return $query->where('rumah_sakit_id', $user->rumah_sakit_id);
+    }
 
     public function pasien()
     {

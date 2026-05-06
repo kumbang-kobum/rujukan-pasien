@@ -7,11 +7,26 @@ use App\Models\Pasien;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Validation\Rule;
 use Carbon\Carbon;
 use PDF; // untuk cetak PDF (setelah install barryvdh/dompdf)
 
 class KunjunganController extends Controller
 {
+    private function authorizeView(Kunjungan $kunjungan): void
+    {
+        abort_unless(
+            Kunjungan::query()->visibleTo(Auth::user())->whereKey($kunjungan->id)->exists(),
+            403
+        );
+    }
+
+    private function dokterQuery()
+    {
+        return User::where('role', User::ROLE_DOKTER)
+            ->where('rumah_sakit_id', Auth::user()->rumah_sakit_id);
+    }
+
     /**
      * Generate no_rawat ala SIMRS: YYYY/MM/DD/00001 (urut per hari)
      */
@@ -37,7 +52,10 @@ class KunjunganController extends Controller
      */
     public function index(Request $request)
     {
-        $query = Kunjungan::with(['pasien','dokter','user'])->latest();
+        $query = Kunjungan::query()
+            ->visibleTo($request->user())
+            ->with(['pasien','dokter','user'])
+            ->latest();
 
         // Default tampil hari ini jika tidak ada filter tanggal
         $start = $request->start_date;
@@ -69,7 +87,7 @@ class KunjunganController extends Controller
         }
 
         $kunjungan = $query->paginate(10)->appends($request->all());
-        $dokter = User::where('role','dokter')->orderBy('name')->get();
+        $dokter = $this->dokterQuery()->orderBy('name')->get();
 
         return view('kunjungan.index', compact('kunjungan','dokter'));
     }
@@ -77,7 +95,7 @@ class KunjunganController extends Controller
     public function create()
     {
         $pasien = Pasien::orderBy('nama')->get();
-        $dokter = User::where('role','dokter')->orderBy('name')->get();
+        $dokter = $this->dokterQuery()->orderBy('name')->get();
 
         return view('kunjungan.create', compact('pasien','dokter'));
     }
@@ -86,7 +104,13 @@ class KunjunganController extends Controller
     {
         $request->validate([
             'pasien_id' => 'required|exists:pasien,id',
-            'dokter_id' => 'required|exists:users,id',
+            'dokter_id' => [
+                'required',
+                Rule::exists('users', 'id')->where(function ($query) {
+                    $query->where('role', User::ROLE_DOKTER)
+                        ->where('rumah_sakit_id', Auth::user()->rumah_sakit_id);
+                }),
+            ],
             'rajalranap'      => 'required|string|max:255',
             'tanggal_kunjungan' => 'required|date',
             'waktu_masuk' => 'required|date_format:H:i',
@@ -117,14 +141,18 @@ class KunjunganController extends Controller
 
     public function show(Kunjungan $kunjungan)
     {
+        $this->authorizeView($kunjungan);
+
         $kunjungan->load(['pasien','dokter','user','soap']);
         return view('kunjungan.show', compact('kunjungan'));
     }
 
     public function edit(Kunjungan $kunjungan)
     {
+        $this->authorizeView($kunjungan);
+
         $pasien = Pasien::orderBy('nama')->get();
-        $dokter = User::where('role','dokter')->orderBy('name')->get();
+        $dokter = $this->dokterQuery()->orderBy('name')->get();
 
         $tanggal_default = optional($kunjungan->tanggal_kunjungan) ?: now()->toDateString();
         $jam_default = $kunjungan->waktu_masuk
@@ -136,9 +164,17 @@ class KunjunganController extends Controller
 
     public function update(Request $request, Kunjungan $kunjungan)
     {
+        $this->authorizeView($kunjungan);
+
         $request->validate([
             'pasien_id' => 'required|exists:pasien,id',
-            'dokter_id' => 'required|exists:users,id',
+            'dokter_id' => [
+                'required',
+                Rule::exists('users', 'id')->where(function ($query) {
+                    $query->where('role', User::ROLE_DOKTER)
+                        ->where('rumah_sakit_id', Auth::user()->rumah_sakit_id);
+                }),
+            ],
             'rajalranap'      => 'required|string|max:255',
             'tanggal_kunjungan' => 'required|date',
             'waktu_masuk' => 'required|date_format:H:i',
@@ -163,6 +199,7 @@ class KunjunganController extends Controller
 
     public function destroy(Kunjungan $kunjungan)
     {
+        $this->authorizeView($kunjungan);
         abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $kunjungan->delete();
         return redirect()->route('kunjungan.index')->with('success','Kunjungan dihapus.');
@@ -173,6 +210,8 @@ class KunjunganController extends Controller
      */
     public function pulangkan(Kunjungan $kunjungan)
     {
+        $this->authorizeView($kunjungan);
+
         if ($kunjungan->status_pulang) {
             return back()->with('info','Pasien sudah dipulangkan.');
         }
@@ -190,7 +229,9 @@ class KunjunganController extends Controller
      */
     public function cetak(Request $request)
 {
-    $query = Kunjungan::with(['pasien','dokter']);
+    $query = Kunjungan::query()
+        ->visibleTo($request->user())
+        ->with(['pasien','dokter']);
 
     // Filter keyword pasien / no RM
     if ($request->filled('keyword')) {

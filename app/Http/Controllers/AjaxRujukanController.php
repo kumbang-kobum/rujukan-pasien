@@ -10,7 +10,7 @@ class AjaxRujukanController extends Controller
     public function dokterByRs(RumahSakit $rs)
     {
         // hanya dokter di RS tsb
-        $list = User::where('role', 'dokter')
+        $list = User::where('role', User::ROLE_DOKTER)
             ->where('rumah_sakit_id', $rs->id)
             ->orderBy('name')
             ->get(['id','name']);

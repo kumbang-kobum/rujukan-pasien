@@ -113,6 +113,111 @@ class KonsultasiFeatureTest extends TestCase
         ]);
     }
 
+    public function test_admin_rs_can_monitor_but_cannot_act_as_consulting_doctor(): void
+    {
+        [$dokterAsal, $dokterTujuan, $kunjungan, $rsTujuan, $rsAsal] = $this->makeConsultationFixtures();
+
+        $adminRsAsal = User::factory()->create([
+            'role' => User::ROLE_ADMIN_RS,
+            'rumah_sakit_id' => $rsAsal->id,
+        ]);
+
+        $consultation = Konsultasi::create([
+            'kunjungan_id' => $kunjungan->id,
+            'rumah_sakit_asal_id' => $rsAsal->id,
+            'rumah_sakit_tujuan_id' => $rsTujuan->id,
+            'dokter_pengirim_id' => $dokterAsal->id,
+            'dokter_tujuan_id' => $dokterTujuan->id,
+            'judul' => 'Konsultasi monitor admin',
+            'alasan_konsultasi' => 'Admin RS perlu bisa memantau tanpa ikut membalas.',
+            'status' => Konsultasi::STATUS_TERKIRIM,
+            'consent_status' => Konsultasi::CONSENT_DIBERIKAN,
+            'consent_nama_pemberi' => 'Tn. Pasien',
+            'consent_hubungan' => 'Pasien sendiri',
+            'consent_metode' => 'tertulis',
+            'consent_diberikan_pada' => now(),
+            'submitted_at' => now(),
+        ]);
+
+        $this->actingAs($adminRsAsal)
+            ->get(route('konsultasi.index'))
+            ->assertOk()
+            ->assertSee('Konsultasi monitor admin');
+
+        $this->actingAs($adminRsAsal)
+            ->get(route('konsultasi.show', $consultation))
+            ->assertOk();
+
+        $this->actingAs($adminRsAsal)
+            ->get(route('konsultasi.create'))
+            ->assertForbidden();
+
+        $this->actingAs($adminRsAsal)
+            ->post(route('konsultasi.reply', $consultation), [
+                'tipe' => 'pesan',
+                'pesan' => 'Admin tidak boleh membalas sebagai dokter.',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_doctor_cannot_create_consultation_from_another_hospital_visit(): void
+    {
+        [$dokterAsal, $dokterTujuan, $kunjungan, $rsTujuan] = $this->makeConsultationFixtures();
+
+        $rsLain = RumahSakit::factory()->create(['nama' => 'RS Lain']);
+        $dokterLain = User::factory()->create([
+            'role' => User::ROLE_DOKTER,
+            'rumah_sakit_id' => $rsLain->id,
+        ]);
+
+        $this->actingAs($dokterLain)
+            ->post(route('konsultasi.store'), [
+                'kunjungan_id' => $kunjungan->id,
+                'rumah_sakit_tujuan_id' => $rsTujuan->id,
+                'dokter_tujuan_id' => $dokterTujuan->id,
+                'judul' => 'Konsultasi lintas data yang tidak sah',
+                'alasan_konsultasi' => 'Harus ditolak karena kunjungan bukan milik RS dokter pengirim.',
+                'consent_status' => 'diberikan',
+                'consent_nama_pemberi' => 'Tn. Pasien',
+                'consent_hubungan' => 'Pasien sendiri',
+                'consent_metode' => 'tertulis',
+                'consent_diberikan_pada' => now()->format('Y-m-d H:i:s'),
+                'submit_action' => 'submit',
+            ])
+            ->assertForbidden();
+    }
+
+    public function test_doctor_can_delete_own_draft_from_consultation_list(): void
+    {
+        [$dokterAsal, $dokterTujuan, $kunjungan, $rsTujuan, $rsAsal] = $this->makeConsultationFixtures();
+
+        $draft = Konsultasi::create([
+            'kunjungan_id' => $kunjungan->id,
+            'rumah_sakit_asal_id' => $rsAsal->id,
+            'rumah_sakit_tujuan_id' => $rsTujuan->id,
+            'dokter_pengirim_id' => $dokterAsal->id,
+            'dokter_tujuan_id' => $dokterTujuan->id,
+            'judul' => 'Draft yang boleh dihapus',
+            'alasan_konsultasi' => 'Masih draft.',
+            'status' => Konsultasi::STATUS_DRAFT,
+            'consent_status' => Konsultasi::CONSENT_MENUNGGU,
+        ]);
+
+        $this->actingAs($dokterAsal)
+            ->get(route('konsultasi.index'))
+            ->assertOk()
+            ->assertSee('Draft yang boleh dihapus')
+            ->assertSee('Hapus');
+
+        $this->actingAs($dokterAsal)
+            ->delete(route('konsultasi.destroy', $draft))
+            ->assertRedirect(route('konsultasi.index'));
+
+        $this->assertDatabaseMissing('konsultasi', [
+            'id' => $draft->id,
+        ]);
+    }
+
     private function makeConsultationFixtures(): array
     {
         $rsAsal = RumahSakit::factory()->create(['nama' => 'RS Asal']);

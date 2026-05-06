@@ -5,9 +5,9 @@
 @php
     $statusLabels = \App\Models\Konsultasi::statusLabels();
     $statusClasses = \App\Models\Konsultasi::statusBadgeClasses();
-    $canReply = $konsultasi->canReply();
     $isSender = (int) $konsultasi->dokter_pengirim_id === (int) auth()->id();
     $isTarget = (int) $konsultasi->dokter_tujuan_id === (int) auth()->id();
+    $canReply = $konsultasi->canReply() && ($isSender || $isTarget);
 @endphp
 
 <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
