@@ -9,6 +9,7 @@ use App\Models\User;
 use App\Notifications\RujukanMasukNotification;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Notification;
+use RuntimeException;
 use Tests\TestCase;
 
 class RujukanNotificationTest extends TestCase
@@ -60,6 +61,33 @@ class RujukanNotificationTest extends TestCase
             return str_contains($mail->subject, 'Pasien Rujukan')
                 && collect($mail->introLines)->contains(fn ($line) => str_contains($line, 'Pasien Rujukan'));
         });
+    }
+
+    public function test_creating_referral_still_succeeds_when_email_transport_fails(): void
+    {
+        [$dokterAsal, $dokterTujuan,, $kunjungan, $rsAsal, $rsTujuan] = $this->makeReferralFixtures();
+
+        Notification::shouldReceive('send')
+            ->once()
+            ->andThrow(new RuntimeException('SMTP bad credentials'));
+
+        $this->actingAs($dokterAsal)
+            ->post(route('rujukan.store'), [
+                'kunjungan_id' => $kunjungan->id,
+                'rumah_sakit_asal_id' => $rsAsal->id,
+                'rumah_sakit_tujuan_id' => $rsTujuan->id,
+                'dokter_tujuan_id' => $dokterTujuan->id,
+                'alasan' => 'Butuh layanan spesialis',
+                'alasan_rujukan' => 'Mohon evaluasi dan tata laksana lanjutan.',
+            ])
+            ->assertRedirect(route('rujukan.index'))
+            ->assertSessionHas('warning');
+
+        $this->assertDatabaseHas('rujukan', [
+            'kunjungan_id' => $kunjungan->id,
+            'dokter_tujuan_id' => $dokterTujuan->id,
+            'status' => 'menunggu',
+        ]);
     }
 
     private function makeReferralFixtures(): array
