@@ -211,10 +211,37 @@ class SOAPController extends Controller
         $this->authorizeView($soap);
 
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
-    
+
+        // Semua SOAP untuk kunjungan yang sama, diurutkan dari yang paling awal
+        $soapList = SOAP::query()
+            ->visibleTo(Auth::user())
+            ->where('kunjungan_id', $soap->kunjungan_id)
+            ->with(['user', 'berkas.uploader'])
+            ->oldest()
+            ->get();
+
         $berkasKunjungan = $soap->berkas()->with('uploader')->latest()->get();
-    
-        return view('soap.show', compact('soap','berkasKunjungan'));
+
+        return view('soap.show', compact('soap', 'soapList', 'berkasKunjungan'));
+    }
+
+    public function cetakSemua(SOAP $soap)
+    {
+        $this->authorizeView($soap);
+
+        $soap->load(['kunjungan.pasien','kunjungan.dokter']);
+
+        $soapList = SOAP::query()
+            ->visibleTo(Auth::user())
+            ->where('kunjungan_id', $soap->kunjungan_id)
+            ->with(['user.rumahSakit'])
+            ->oldest()
+            ->get();
+
+        $pdf = PDF::loadView('soap.cetak_semua', compact('soap', 'soapList'))
+            ->setPaper('A4', 'landscape');
+
+        return $pdf->stream('SOAP-'.$soap->kunjungan->no_rawat.'.pdf');
     }
 
     public function edit(SOAP $soap)

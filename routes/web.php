@@ -52,6 +52,7 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('pasien', PasienController::class);
         Route::resource('soap', SOAPController::class);
         Route::get('soap/{soap}/cetak', [SOAPController::class,'cetak'])->name('soap.cetak');
+        Route::get('soap/{soap}/cetak-semua', [SOAPController::class,'cetakSemua'])->name('soap.cetakSemua');
         Route::resource('rujukan', RujukanController::class);
         Route::patch('/rujukan/{rujukan}/status/{status}', [RujukanController::class,'ubahStatus'])->name('rujukan.ubahStatus');
         Route::get('berkas/{berka}/file', [BerkasMedisController::class, 'file'])->name('berkas.file');

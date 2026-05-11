@@ -1,160 +1,184 @@
 @extends('layouts.app')
-@section('title','Detail SOAP')
+@section('title','Catatan SOAP — '.$soap->kunjungan->no_rawat)
 @section('content')
 
-<div class="card shadow-sm">
-    <div class="card-header bg-info text-white">
-        <i class="fas fa-notes-medical"></i> Detail SOAP
-        <a href="{{ route('soap.index') }}" class="btn btn-light btn-sm float-end">
-            <i class="fas fa-arrow-left"></i> Kembali
-        </a>
-        <a href="{{ route('soap.cetak',$soap->id) }}" class="btn btn-primary" target="_blank">Cetak PDF</a>
+{{-- Header info pasien --}}
+<div class="card shadow-sm mb-3">
+    <div class="card-header bg-info text-white d-flex justify-content-between align-items-center">
+        <span><i class="fas fa-notes-medical me-2"></i>Catatan SOAP — No. Rawat: <strong>{{ $soap->kunjungan->no_rawat }}</strong></span>
+        <div class="d-flex gap-2">
+            <a href="{{ route('soap.cetakSemua', $soap->id) }}" class="btn btn-primary btn-sm" target="_blank">
+                <i class="fas fa-print"></i> Cetak PDF
+            </a>
+            <a href="{{ route('soap.index') }}" class="btn btn-light btn-sm">
+                <i class="fas fa-arrow-left"></i> Kembali
+            </a>
+        </div>
     </div>
-    <div class="card-body">
-        <table class="table table-bordered">
-            <tr>
-                <th width="200">No. Rawat</th>
-                <td>{{ $soap->kunjungan->no_rawat ?? '-' }}</td>
-            </tr>
-            <tr>
-                <th>Pasien</th>
-                <td>
-                    {{ $soap->kunjungan->pasien->no_rkm_medis ?? '-' }} -
-                    {{ $soap->kunjungan->pasien->nama ?? '-' }}
-                </td>
-            </tr>
-            <tr>
-                <th>Dokter</th>
-                <td>{{ $soap->kunjungan->dokter->name ?? '-' }}</td>
-            </tr>
-            <tr>
-                <th>User Input</th>
-                <td>{{ $soap->user->name ?? '-' }}</td>
-            </tr>
-            <tr>
-                <th>Tanggal SOAP</th>
-                <td>{{ $soap->created_at->format('d-m-Y H:i') }}</td>
-            </tr>
-            <tr>
-                <th>Subjektif</th>
-                <td>{!! nl2br(e($soap->subjektif ?? '-')) !!}</td>
-            </tr>
-            <tr>
-              <th>Objektif</th>
-              <td>
-                {!! nl2br(e($soap->objektif ?? '-')) !!}
-                
-                @if($soap->berkas->count())
-                  <div class="mt-3">
-                    <strong>Lampiran (Objektif):</strong>
-                    <div class="row g-3 mt-1">
-                      @foreach($soap->berkas as $b)
-                        @php
-                          $url = route('berkas.file', $b);
-                          $ext = strtolower(pathinfo($b->path, PATHINFO_EXTENSION));
-                          $isImage = in_array($ext, ['jpg','jpeg','png','gif','webp','bmp']);
-                        @endphp
-            
-                        <div class="col-6 col-md-3">
-                          @if($isImage)
-                            <a href="{{ $url }}" target="_blank" rel="noopener">
-                              <img src="{{ $url }}" class="img-fluid rounded border" alt="{{ $b->nama_file }}">
-                            </a>
-                            <div class="small text-muted mt-1">
-                              [{{ $b->kategori ?? 'LAIN' }}] {{ $b->nama_file }}
-                            </div>
-                          @else
-                            <a href="{{ $url }}" target="_blank" rel="noopener" class="d-block p-3 border rounded text-center">
-                              <i class="far fa-file fa-2x d-block mb-2"></i>
-                              {{ $b->nama_file }}
-                            </a>
-                          @endif
-                        </div>
-                      @endforeach
-                    </div>
-                  </div>
-                @endif
-            
-                {{-- Lampiran USG/Lab untuk SOAP ini --}}
-                @if($soap->berkas->count())
-                  <div class="mt-2">
-                    <strong>Lampiran (Objektif):</strong>
-                    <ul class="mb-2">
-                      @foreach($soap->berkas as $b)
-                        <li>
-                          [{{ $b->kategori ?? 'LAIN' }}]
-                          <a href="{{ route('berkas.file', $b) }}" target="_blank">{{ $b->nama_file }}</a>
-                          <small class="text-muted">— {{ $b->uploader->name ?? 'User' }}</small>
-                        </li>
-                      @endforeach
-                    </ul>
-                  </div>
-                @endif
-              </td>
-            </tr>
-            <tr>
-                <th>TD / MAP</th>
-                <td>
-                    @php($sys=$soap->td_sys) @php($dia=$soap->td_dia) @php($m=$soap->map)
-                    {{ $sys && $dia ? "TD: {$sys}/{$dia} mmHg" : '-' }}
-                    {{ $m ? " — MAP: {$m} mmHg" : '' }}
-                </td>
-            </tr>
-            <tr>
-                <th>Assessment</th>
-                <td>{!! nl2br(e($soap->assessment ?? '-')) !!}</td>
-            </tr>
-            <tr>
-                <th>Plan</th>
-                <td>{!! nl2br(e($soap->plan ?? '-')) !!}</td>
-            </tr>
-            <tr>
-                <th>Advice</th>
-                <td>{!! nl2br(e($soap->advice ?? '-')) !!}</td>
-            </tr>
+    <div class="card-body py-2">
+        <div class="row row-cols-auto g-3 align-items-center">
+            <div class="col"><strong>Pasien:</strong> {{ $soap->kunjungan->pasien->no_rkm_medis ?? '-' }} — {{ $soap->kunjungan->pasien->nama ?? '-' }}</div>
+            <div class="col"><strong>Dokter:</strong> {{ $soap->kunjungan->dokter->name ?? '-' }}</div>
+            <div class="col"><span class="badge bg-secondary">{{ $soapList->count() }} catatan SOAP</span></div>
+        </div>
+    </div>
+</div>
+
+{{-- Tabel kolom menyamping --}}
+<div class="card shadow-sm mb-4">
+    <div class="card-body p-0">
+        <div class="table-responsive">
+            <table class="table table-bordered table-sm align-top mb-0" style="min-width: {{ 140 + $soapList->count() * 220 }}px">
+                <thead class="table-dark">
+                    <tr>
+                        <th class="text-nowrap" style="width:130px; min-width:130px; background:#343a40; position:sticky; left:0; z-index:2;">Keterangan</th>
+                        @foreach($soapList as $s)
+                            <th style="min-width:210px; vertical-align:top">
+                                <div class="fw-bold">SOAP #{{ $loop->iteration }}</div>
+                                <div class="fw-normal small">{{ $s->created_at->format('d/m/Y H:i') }}</div>
+                                <div class="fw-normal small text-warning">{{ $s->user?->name ?? '-' }}</div>
+                                @if($s->id === $soap->id)
+                                    <span class="badge bg-warning text-dark mt-1">sedang dilihat</span>
+                                @endif
+                            </th>
+                        @endforeach
+                    </tr>
+                </thead>
+                <tbody>
+                    {{-- Tanda Vital --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">TD / MAP</th>
+                        @foreach($soapList as $s)
+                            <td>
+                                @if($s->td_sys || $s->td_dia)
+                                    {{ $s->td_sys ?? '?' }}/{{ $s->td_dia ?? '?' }} mmHg
+                                    @if($s->map) <br><small class="text-muted">MAP: {{ $s->map }} mmHg</small>@endif
+                                @else
+                                    <span class="text-muted">—</span>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    {{-- Subjektif --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Subjektif (S)</th>
+                        @foreach($soapList as $s)
+                            <td style="white-space:pre-line; max-width:280px">{{ $s->subjektif ?? '—' }}</td>
+                        @endforeach
+                    </tr>
+                    {{-- Objektif --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Objektif (O)</th>
+                        @foreach($soapList as $s)
+                            <td style="max-width:280px">
+                                <div style="white-space:pre-line">{{ $s->objektif ?? '—' }}</div>
+                                @if($s->berkas->count())
+                                    <div class="mt-2 d-flex flex-wrap gap-2">
+                                        @foreach($s->berkas as $b)
+                                            @php
+                                                $ext = strtolower(pathinfo($b->path ?? '', PATHINFO_EXTENSION));
+                                                $isImg = in_array($ext, ['jpg','jpeg','png','gif','webp']);
+                                            @endphp
+                                            @if($isImg)
+                                                <a href="{{ route('berkas.file', $b) }}" target="_blank">
+                                                    <img src="{{ route('berkas.file', $b) }}" style="max-height:80px; max-width:100px" class="rounded border">
+                                                </a>
+                                            @else
+                                                <a href="{{ route('berkas.file', $b) }}" target="_blank" class="btn btn-outline-secondary btn-sm">
+                                                    <i class="far fa-file"></i> {{ $b->nama_file }}
+                                                </a>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                    {{-- Assessment --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Assessment (A)</th>
+                        @foreach($soapList as $s)
+                            <td style="white-space:pre-line; max-width:280px">{{ $s->assessment ?? '—' }}</td>
+                        @endforeach
+                    </tr>
+                    {{-- Plan --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Plan (P)</th>
+                        @foreach($soapList as $s)
+                            <td style="white-space:pre-line; max-width:280px">{{ $s->plan ?? '—' }}</td>
+                        @endforeach
+                    </tr>
+                    {{-- Advice --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Advice</th>
+                        @foreach($soapList as $s)
+                            <td style="white-space:pre-line; max-width:280px">{{ $s->advice ?? '—' }}</td>
+                        @endforeach
+                    </tr>
+                    {{-- Aksi per SOAP --}}
+                    <tr>
+                        <th class="bg-light text-nowrap" style="position:sticky; left:0; z-index:1;">Aksi</th>
+                        @foreach($soapList as $s)
+                            <td class="text-nowrap">
+                                <a href="{{ route('soap.edit', $s->id) }}" class="btn btn-warning btn-sm">
+                                    <i class="fas fa-edit"></i> Edit
+                                </a>
+                                <a href="{{ route('soap.cetak', $s->id) }}" class="btn btn-outline-secondary btn-sm" target="_blank">
+                                    <i class="fas fa-print"></i>
+                                </a>
+                                @if(auth()->user()->isAdmin())
+                                    <form action="{{ route('soap.destroy', $s->id) }}" method="POST" class="d-inline"
+                                          onsubmit="return confirm('Hapus SOAP #{{ $loop->iteration }}?')">
+                                        @csrf @method('DELETE')
+                                        <button class="btn btn-danger btn-sm"><i class="fas fa-trash"></i></button>
+                                    </form>
+                                @endif
+                            </td>
+                        @endforeach
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+{{-- Berkas Medis --}}
+@if($berkasKunjungan->isNotEmpty())
+<div class="card shadow-sm">
+    <div class="card-header">Berkas Medis Kunjungan</div>
+    <div class="card-body p-0">
+        <table class="table table-bordered table-sm mb-0">
+            <thead class="table-secondary">
+                <tr>
+                    <th>No</th>
+                    <th>Kategori</th>
+                    <th>Nama File</th>
+                    <th>Uploader</th>
+                    <th>Aksi</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach($berkasKunjungan as $i => $b)
+                    <tr>
+                        <td>{{ $i + 1 }}</td>
+                        <td>{{ strtoupper($b->kategori ?? '-') }}</td>
+                        <td><a href="{{ route('berkas.file', $b) }}" target="_blank">{{ $b->nama_file }}</a></td>
+                        <td>{{ $b->uploader->name ?? '-' }}</td>
+                        <td class="text-nowrap">
+                            <a href="{{ route('berkas.edit', ['berka' => $b->id, 'redirect' => route('soap.show', $soap->id)]) }}"
+                               class="btn btn-warning btn-sm">Edit</a>
+                            <form action="{{ route('berkas.destroy', $b->id) }}?redirect={{ urlencode(route('soap.show',$soap->id)) }}"
+                                  method="POST" class="d-inline">
+                                @csrf @method('DELETE')
+                                <button class="btn btn-danger btn-sm">Hapus</button>
+                            </form>
+                        </td>
+                    </tr>
+                @endforeach
+            </tbody>
         </table>
     </div>
 </div>
-@if($berkasKunjungan->isNotEmpty())
-  <hr class="my-4">
-  <h5>Berkas Medis (kunjungan ini)</h5>
-
-  <table class="table table-bordered">
-    <thead>
-      <tr>
-        <th>No</th>
-        <th>Kategori</th>
-        <th>Nama File</th>
-        <th>Uploader</th>
-        <th>Aksi</th>
-      </tr>
-    </thead>
-    <tbody>
-      @foreach($berkasKunjungan as $i => $b)
-        <tr>
-          <td>{{ $i + 1 }}</td>
-          <td>{{ strtoupper($b->kategori) }}</td>
-          <td>
-            <a href="{{ route('berkas.file', $b) }}" target="_blank">
-              {{ $b->nama_file }}
-            </a>
-          </td>
-          <td>{{ $b->uploader->name ?? '-' }}</td>
-          <td class="text-nowrap">
-            <a href="{{ route('berkas.edit', ['berka' => $b->id, 'redirect' => route('soap.show', $soap->id)]) }}"
-               class="btn btn-warning btn-sm">Edit</a>
-            <form action="{{ route('berkas.destroy', ['berka' => $b->id]) }}?redirect={{ urlencode(route('soap.show',$soap->id)) }}"
-                  method="POST" class="d-inline">
-              @csrf @method('DELETE')
-              <button class="btn btn-danger btn-sm">Hapus</button>
-            </form>
-          </td>
-        </tr>
-      @endforeach
-    </tbody>
-  </table>
-@else
-  <p class="text-muted">Belum ada berkas pada kunjungan ini.</p>
 @endif
 
 @endsection
