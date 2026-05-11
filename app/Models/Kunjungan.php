@@ -44,7 +44,13 @@ class Kunjungan extends Model
             return $query;
         }
 
-        return $query->where('rumah_sakit_id', $user->rumah_sakit_id);
+        return $query->where(function (Builder $q) use ($user) {
+            $q->where('rumah_sakit_id', $user->rumah_sakit_id)
+              ->orWhereHas('rujukan', function (Builder $r) use ($user) {
+                  $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
+                    ->where('status', 'diterima');
+              });
+        });
     }
 
     public function pasien()

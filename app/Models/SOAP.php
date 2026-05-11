@@ -32,7 +32,13 @@ class SOAP extends Model
         }
 
         return $query->whereHas('kunjungan', function (Builder $kunjungan) use ($user) {
-            $kunjungan->where('rumah_sakit_id', $user->rumah_sakit_id);
+            $kunjungan->where(function (Builder $q) use ($user) {
+                $q->where('rumah_sakit_id', $user->rumah_sakit_id)
+                  ->orWhereHas('rujukan', function (Builder $r) use ($user) {
+                      $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
+                        ->where('status', 'diterima');
+                  });
+            });
         });
     }
 
