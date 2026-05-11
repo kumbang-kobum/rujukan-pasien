@@ -198,12 +198,20 @@ class RujukanController extends Controller
         // kirim email ke dokter utama + semua CC
         $recipientIds = $ccIds->push((int)$request->dokter_tujuan_id)->unique()->values();
         $recipients   = User::whereIn('id', $recipientIds)->whereNotNull('email')->get();
+        $emailWarning = null;
         if ($recipients->isNotEmpty()) {
-            Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
+            try {
+                Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
+            } catch (\Exception $e) {
+                $emailWarning = 'Rujukan berhasil disimpan, namun notifikasi email gagal terkirim. ('.$e->getMessage().')';
+            }
         }
-    
-        return redirect()->route('rujukan.index')
-            ->with('success','Rujukan berhasil ditambahkan & email dikirim ke dokter tujuan/tembusan.');
+
+        $redirect = redirect()->route('rujukan.index')->with('success','Rujukan berhasil ditambahkan.');
+        if ($emailWarning) {
+            $redirect->with('warning', $emailWarning);
+        }
+        return $redirect;
     }
 
     public function edit(Rujukan $rujukan)
@@ -301,17 +309,26 @@ class RujukanController extends Controller
         }
         $recipientIds = $recipientIds->merge($ccIds)->unique()->values();
     
+        $emailWarning = null;
         if ($recipientIds->isNotEmpty()) {
             $recipients = User::whereIn('id', $recipientIds)
                 ->whereNotNull('email')
                 ->get();
-    
+
             if ($recipients->isNotEmpty()) {
-                Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
+                try {
+                    Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
+                } catch (\Exception $e) {
+                    $emailWarning = 'Rujukan berhasil disimpan, namun notifikasi email gagal terkirim. ('.$e->getMessage().')';
+                }
             }
         }
-    
-        return redirect()->route('rujukan.index')->with('success','Rujukan berhasil diperbarui.');
+
+        $redirect = redirect()->route('rujukan.index')->with('success','Rujukan berhasil diperbarui.');
+        if ($emailWarning) {
+            $redirect->with('warning', $emailWarning);
+        }
+        return $redirect;
     }
 
     public function destroy(Rujukan $rujukan)

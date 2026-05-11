@@ -5,7 +5,7 @@ namespace App\Notifications;
 use App\Models\Rujukan;
 use App\Models\User;
 use Illuminate\Bus\Queueable;
-use Illuminate\Contracts\Queue\ShouldQueue; // optional: queue
+use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Notifications\Messages\MailMessage;
 use Illuminate\Notifications\Notification;
 
@@ -20,23 +20,22 @@ class RujukanMasukNotification extends Notification implements ShouldQueue
 
     public function via(object $notifiable): array
     {
+        if (empty($notifiable->email)) {
+            return [];
+        }
+
         return ['mail'];
     }
 
     public function toMail(object $notifiable): MailMessage
     {
-        // pastikan relasi ter-load (penting kalau pakai queue)
         $r = $this->rujukan->fresh()->loadMissing([
-            'kunjungan.pasien', 'rsAsal', 'rsTujuan'
+            'kunjungan.pasien', 'rsAsal', 'rsTujuan',
         ]);
 
-        $noRawat = $r->kunjungan?->no_rawat ?? '-';
+        $noRawat  = $r->kunjungan?->no_rawat ?? '-';
         $nmPasien = $r->kunjungan?->pasien?->nama ?? '-';
-        // no RM bisa ada di pasien atau kunjungan, ambil yang ada
-        $noRM = $r->kunjungan?->pasien?->no_rkm_medis
-              ?? $r->kunjungan?->no_rkm_medis
-              ?? '-';
-
+        $noRM     = $r->kunjungan?->pasien?->no_rkm_medis ?? '-';
         $namaAsal   = $r->rsAsal?->nama   ?? '(RS Asal tidak tersedia)';
         $namaTujuan = $r->rsTujuan?->nama ?? '(RS Tujuan tidak tersedia)';
 
