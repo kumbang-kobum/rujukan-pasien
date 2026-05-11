@@ -113,9 +113,18 @@ class SOAPController extends Controller
 
     public function create()
     {
+        $user = Auth::user();
         $kunjungan = $this->visibleKunjunganQuery()
             ->with('pasien')
-            ->where('status_pulang', 0)
+            ->where(function ($q) use ($user) {
+                // kunjungan sendiri: hanya yang masih aktif
+                $q->where('status_pulang', 0)
+                  // kunjungan rujukan diterima: tampilkan meski sudah berstatus pulang di RS asal
+                  ->orWhereHas('rujukan', function ($r) use ($user) {
+                      $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
+                        ->where('status', 'diterima');
+                  });
+            })
             ->orderByDesc('tanggal_kunjungan')
             ->get();
 
@@ -205,9 +214,16 @@ class SOAPController extends Controller
     {
         $this->authorizeView($soap);
 
+        $user = Auth::user();
         $kunjungan = $this->visibleKunjunganQuery()
             ->with('pasien')
-            ->where('status_pulang', 0)
+            ->where(function ($q) use ($user) {
+                $q->where('status_pulang', 0)
+                  ->orWhereHas('rujukan', function ($r) use ($user) {
+                      $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
+                        ->where('status', 'diterima');
+                  });
+            })
             ->orderByDesc('tanggal_kunjungan')
             ->get();
 
