@@ -57,14 +57,22 @@ class KunjunganController extends Controller
             ->with(['pasien','dokter','user'])
             ->latest();
 
-        // Default tampil hari ini jika tidak ada filter tanggal
+        // Default: hari ini + seluruh rujukan yang sudah diterima (lintas tanggal)
         $start = $request->start_date;
         $end   = $request->end_date;
 
         if ($start && $end) {
             $query->whereBetween('tanggal_kunjungan', [$start, $end]);
-        } else {
+        } elseif ($request->user()->isSuperAdmin()) {
             $query->whereDate('tanggal_kunjungan', now()->toDateString());
+        } else {
+            $query->where(function ($q) use ($request) {
+                $q->whereDate('tanggal_kunjungan', now()->toDateString())
+                  ->orWhereHas('rujukan', function ($r) use ($request) {
+                      $r->where('rumah_sakit_tujuan_id', $request->user()->rumah_sakit_id)
+                        ->where('status', 'diterima');
+                  });
+            });
         }
 
         // Filter pasien (nama / no RM)

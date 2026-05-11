@@ -37,6 +37,9 @@
           <option value="">-- Pilih Pasien --</option>
           @foreach($kunjungan as $k)
             <option value="{{ $k->id }}" @selected((int) old('kunjungan_id', $selectedKunjunganId ?? 0) === (int) $k->id)>
+              @if((int)$k->rumah_sakit_id !== $myRsId)
+                [Rujukan: {{ $k->rumahSakit?->nama ?? 'RS Lain' }}]
+              @endif
               {{ $k->no_rawat }} - {{ $k->pasien->no_rkm_medis }} - {{ $k->pasien->nama }}
             </option>
           @endforeach

@@ -117,7 +117,7 @@ class SOAPController extends Controller
         $selectedKunjunganId = $request->integer('kunjungan_id') ?: null;
 
         $kunjungan = $this->visibleKunjunganQuery()
-            ->with('pasien')
+            ->with(['pasien', 'rumahSakit'])
             ->where(function ($q) use ($user) {
                 // kunjungan sendiri: hanya yang masih aktif
                 $q->where('status_pulang', 0)
@@ -134,7 +134,8 @@ class SOAPController extends Controller
             abort(403);
         }
 
-        return view('soap.create', compact('kunjungan', 'selectedKunjunganId'));
+        $myRsId = (int) $user->rumah_sakit_id;
+        return view('soap.create', compact('kunjungan', 'selectedKunjunganId', 'myRsId'));
     }
 
     public function store(Request $request)
@@ -222,7 +223,7 @@ class SOAPController extends Controller
 
         $user = Auth::user();
         $kunjungan = $this->visibleKunjunganQuery()
-            ->with('pasien')
+            ->with(['pasien', 'rumahSakit'])
             ->where(function ($q) use ($user) {
                 $q->where('status_pulang', 0)
                   ->orWhereHas('rujukan', function ($r) use ($user) {
@@ -233,12 +234,13 @@ class SOAPController extends Controller
             ->orderByDesc('tanggal_kunjungan')
             ->get();
 
+        $myRsId = (int) $user->rumah_sakit_id;
         // HANYA berkas untuk kunjungan ini
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
     
         $berkasKunjungan = $soap->berkas()->with('uploader')->latest()->get();
     
-        return view('soap.edit', compact('soap', 'kunjungan', 'berkasKunjungan'));
+        return view('soap.edit', compact('soap', 'kunjungan', 'berkasKunjungan', 'myRsId'));
     }
 
 

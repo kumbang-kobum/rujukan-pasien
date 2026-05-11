@@ -53,6 +53,11 @@ class Kunjungan extends Model
         });
     }
 
+    public function rumahSakit()
+    {
+        return $this->belongsTo(RumahSakit::class, 'rumah_sakit_id');
+    }
+
     public function pasien()
     {
         return $this->belongsTo(Pasien::class);

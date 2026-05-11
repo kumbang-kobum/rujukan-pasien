@@ -72,7 +72,7 @@
                         <th>Rawat Jalan / Rawat Inap</th>
                         <th>Tanggal</th>
                         <th>Status</th>
-                        <th>Penerima</th>
+                        <th>Keterangan</th>
                         <th class="text-center">Aksi</th>
                     </tr>
                 </thead>
@@ -99,7 +99,13 @@
                                 <span class="badge bg-warning text-dark">Rawat</span>
                             @endif
                         </td>
-                        <td>{{ $k->penerima->name ?? '-' }}</td> {{-- fix: $r -> $k --}}
+                        <td>
+                            @if(auth()->user()->rumah_sakit_id && (int)$k->rumah_sakit_id !== (int)auth()->user()->rumah_sakit_id)
+                                <span class="badge bg-info text-dark">Rujukan Masuk</span>
+                            @else
+                                —
+                            @endif
+                        </td>
                         <td class="text-center text-nowrap">
                             <a href="{{ route('kunjungan.show', $k->id) }}" class="btn btn-info btn-sm">Lihat</a>
                             <a href="{{ route('kunjungan.edit', $k->id) }}" class="btn btn-warning btn-sm">Edit</a>

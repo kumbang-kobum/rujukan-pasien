@@ -20,6 +20,9 @@
         <select name="kunjungan_id" class="form-control" disabled>
           @foreach($kunjungan as $k)
             <option value="{{ $k->id }}" {{ $soap->kunjungan_id == $k->id ? 'selected' : '' }}>
+              @if(isset($myRsId) && (int)$k->rumah_sakit_id !== $myRsId)
+                [Rujukan: {{ $k->rumahSakit?->nama ?? 'RS Lain' }}]
+              @endif
               {{ $k->no_rawat }} - {{ $k->pasien->no_rkm_medis }} - {{ $k->pasien->nama }}
             </option>
           @endforeach
