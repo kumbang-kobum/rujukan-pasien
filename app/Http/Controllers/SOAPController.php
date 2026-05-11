@@ -115,8 +115,8 @@ class SOAPController extends Controller
     {
         $kunjungan = $this->visibleKunjunganQuery()
             ->with('pasien')
-            ->whereDate('tanggal_kunjungan', now()->toDateString())
             ->where('status_pulang', 0)
+            ->orderByDesc('tanggal_kunjungan')
             ->get();
 
         return view('soap.create', compact('kunjungan'));
@@ -207,10 +207,10 @@ class SOAPController extends Controller
 
         $kunjungan = $this->visibleKunjunganQuery()
             ->with('pasien')
-            ->whereDate('tanggal_kunjungan', now()->toDateString())
             ->where('status_pulang', 0)
+            ->orderByDesc('tanggal_kunjungan')
             ->get();
-    
+
         // HANYA berkas untuk kunjungan ini
         $soap->load(['kunjungan.pasien','kunjungan.dokter','user']);
     

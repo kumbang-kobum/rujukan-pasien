@@ -68,4 +68,47 @@
     <a href="{{ route('rujukan.edit',$rujukan->id) }}" class="btn btn-warning">Edit</a>
   </div>
 </div>
+
+{{-- SOAP dari RS Asal --}}
+@php($soapList = $rujukan->kunjungan?->soap ?? collect())
+@if($soapList->isNotEmpty())
+<div class="card shadow-sm mt-4">
+  <div class="card-header bg-secondary text-white">
+    Catatan SOAP dari {{ $rujukan->rsAsal?->nama ?? 'RS Asal' }}
+  </div>
+  <div class="card-body">
+    @foreach($soapList as $soap)
+      <div class="border rounded p-3 mb-3">
+        <div class="d-flex justify-content-between mb-2">
+          <strong>SOAP #{{ $soap->id }}</strong>
+          <small class="text-muted">{{ $soap->created_at->format('d/m/Y H:i') }} &mdash; {{ $soap->user?->name ?? '-' }}</small>
+        </div>
+
+        @if($soap->td_sys || $soap->td_dia || $soap->map)
+          <p class="mb-1"><strong>Tanda Vital:</strong>
+            TD {{ $soap->td_sys ?? '?' }}/{{ $soap->td_dia ?? '?' }} mmHg,
+            MAP {{ $soap->map ?? '?' }} mmHg
+          </p>
+        @endif
+
+        @if($soap->subjektif)
+          <p class="mb-1"><strong>S:</strong> {!! nl2br(e($soap->subjektif)) !!}</p>
+        @endif
+        @if($soap->objektif)
+          <p class="mb-1"><strong>O:</strong> {!! nl2br(e($soap->objektif)) !!}</p>
+        @endif
+        @if($soap->assessment)
+          <p class="mb-1"><strong>A:</strong> {!! nl2br(e($soap->assessment)) !!}</p>
+        @endif
+        @if($soap->plan)
+          <p class="mb-1"><strong>P:</strong> {!! nl2br(e($soap->plan)) !!}</p>
+        @endif
+        @if($soap->advice)
+          <p class="mb-0"><strong>Advice:</strong> {!! nl2br(e($soap->advice)) !!}</p>
+        @endif
+      </div>
+    @endforeach
+  </div>
+</div>
+@endif
 @endsection
