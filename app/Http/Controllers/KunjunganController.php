@@ -154,7 +154,9 @@ class KunjunganController extends Controller
         $pasien = Pasien::orderBy('nama')->get();
         $dokter = $this->dokterQuery()->orderBy('name')->get();
 
-        $tanggal_default = optional($kunjungan->tanggal_kunjungan) ?: now()->toDateString();
+        $tanggal_default = $kunjungan->tanggal_kunjungan
+            ? $kunjungan->tanggal_kunjungan->toDateString()
+            : now()->toDateString();
         $jam_default = $kunjungan->waktu_masuk
             ? Carbon::parse($kunjungan->waktu_masuk)->format('H:i')
             : now()->format('H:i');

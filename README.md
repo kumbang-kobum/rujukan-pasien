@@ -1,119 +1,121 @@
 # Rujukan Pasien
 
-Aplikasi web rujukan pasien berbasis Laravel untuk pengelolaan pasien,
-kunjungan, SOAP, rujukan, berkas medis, konsultasi antar dokter, rumah sakit,
-dan user berdasarkan role.
+Aplikasi web manajemen rujukan pasien antar rumah sakit, berbasis Laravel.
+Mendukung pengelolaan kunjungan, catatan SOAP, berkas medis, konsultasi dokter,
+notifikasi email rujukan, dan kontrol akses berbasis role.
 
 Repo GitHub:
 
-```bash
+```
 https://github.com/kumbang-kobum/rujukan-pasien.git
 ```
 
-## Stack Project
+## Stack
 
-- Laravel 12
-- PHP 8.2 atau lebih baru
-- MySQL/MariaDB
-- Composer
-- Node.js dan NPM untuk asset Vite/Tailwind
-- Laravel Breeze untuk autentikasi
-- DomPDF untuk cetak PDF
+| Komponen | Versi / Detail |
+|---|---|
+| Laravel | 12.x |
+| PHP | 8.2 atau lebih baru |
+| Database | MySQL / MariaDB |
+| Autentikasi | Laravel Breeze |
+| Cetak PDF | barryvdh/laravel-dompdf |
+| Email Transaksional | **Brevo API** (bukan SMTP bawaan Laravel) |
+| Asset bundler | Vite + NPM |
 
-## Struktur Penting
+## Role Pengguna
 
-- `app/Http/Controllers`: logic fitur aplikasi
-- `app/Models`: model Eloquent
-- `database/migrations`: struktur database
-- `database/seeders/UserSeeder.php`: user awal untuk development/testing
-- `resources/views`: Blade template
-- `routes/web.php`: route web aplikasi
-- `public`: document root web server
-- `storage/app/private/berkas`: penyimpanan private untuk berkas medis
-- `storage/app/public`: file publik non-medis dan fallback file lama
+| Role | Akses |
+|---|---|
+| `super_admin` | Kelola master rumah sakit dan seluruh akun di semua RS |
+| `admin_rs` | Kelola akun pengguna dalam satu RS, akses semua fitur klinis RS tersebut |
+| `dokter` | Buat/lihat rujukan, buat SOAP, konsultasi |
+| `petugas` | Buat SOAP, upload berkas medis |
+
+## Alur Penggunaan Rujukan
+
+1. **RS Asal (RS S)** — buat kunjungan pasien → buat catatan SOAP → buat rujukan ke RS B.
+2. **RS Tujuan (RS B)** — login, buka menu Rujukan, klik **Lihat** pada rujukan masuk.
+3. Di halaman detail rujukan, klik **Terima Rujukan** (atau Tolak).
+4. Setelah status *Diterima*, RS B dapat membuka menu **SOAP → Tambah SOAP** dan memilih pasien yang dirujuk dari dropdown.
+5. SOAP dari RS S terlihat di bagian bawah halaman detail rujukan untuk referensi klinis.
+
+> Pasien dari rujukan hanya muncul di dropdown SOAP setelah rujukan berstatus **Diterima**.
+
+## Struktur Direktori Penting
+
+```
+app/
+  Http/Controllers/   — logika fitur (CRUD + bisnis)
+  Models/             — Eloquent model dengan scope visibilitas per RS
+  Notifications/      — RujukanMasukNotification (email via Brevo)
+  Services/           — BrevoMailer (HTTP client ke Brevo API)
+config/
+  services.php        — konfigurasi Brevo (key, sender)
+  soap_templates.php  — preset template SOAP & USG
+database/migrations/  — skema tabel
+resources/views/      — Blade template
+routes/web.php        — route web dengan middleware role
+storage/app/private/berkas/  — berkas medis (private, wajib login)
+```
 
 ## Akun Awal Seeder
 
-Jika menjalankan `php artisan migrate --seed`, aplikasi membuat akun contoh:
+Jalankan `php artisan migrate --seed` untuk membuat akun contoh:
 
-- `superadmin@example.com`
-- `admin.rsa@example.com`
-- `admin.rsb@example.com`
-- `dokter.rsa@example.com`
-- `dokter.rsb@example.com`
-- `perawat.rsa@example.com`
-- `perawat.rsb@example.com`
+| Email | Role |
+|---|---|
+| `superadmin@example.com` | Super Admin |
+| `admin.rsa@example.com` | Admin RS A |
+| `admin.rsb@example.com` | Admin RS B |
+| `dokter.rsa@example.com` | Dokter RS A |
+| `dokter.rsb@example.com` | Dokter RS B |
+| `perawat.rsa@example.com` | Petugas RS A |
+| `perawat.rsb@example.com` | Petugas RS B |
 
-Password awal semua akun contoh adalah:
+Password semua akun contoh:
 
-```text
+```
 password
 ```
 
-Ganti password setelah login, terutama jika data ini pernah dipakai di server
-online.
+Ganti password segera setelah login, terutama di environment yang bisa diakses publik.
 
-Role awal:
+---
 
-- `superadmin@example.com`: Super Admin platform, untuk mengelola master rumah sakit dan seluruh akun.
-- `admin.rsa@example.com` / `admin.rsb@example.com`: Admin RS, hanya mengelola akun pada rumah sakit masing-masing.
-- `dokter.*`: Dokter RS.
-- `perawat.*`: Petugas RS. Email lama tetap dipakai supaya data contoh lama tidak membingungkan, tetapi role aplikasinya sekarang `petugas`.
+## Setup Development (macOS + XAMPP)
 
-## Setup Development di macOS dengan MySQL XAMPP
+### 1. Prasyarat
 
-Project ini sebelumnya dikembangkan di Windows. Di macOS, lebih aman dependency
-PHP dan Node di-install ulang dari awal, sedangkan database bisa tetap memakai
-MySQL dari XAMPP.
+Pastikan sudah tersedia:
 
-### 1. Install kebutuhan lokal
-
-Pastikan sudah ada:
-
-- XAMPP for macOS, untuk MySQL/phpMyAdmin
-- PHP 8.2 atau lebih baru
+- XAMPP for macOS (untuk MySQL/phpMyAdmin)
+- PHP 8.2+
 - Composer
-- Node.js LTS dan NPM
+- Node.js LTS + NPM
 - Git
 
-Cek versi:
-
 ```bash
-php -v
-composer -V
-node -v
-npm -v
-git --version
+php -v && composer -V && node -v && npm -v
 ```
 
 Laravel 12 membutuhkan PHP minimal 8.2. Jika PHP bawaan macOS tidak sesuai,
-pakai PHP dari Homebrew atau PHP dari XAMPP, lalu pastikan command `php` di
-terminal menunjuk ke versi yang benar.
+pakai PHP dari Homebrew atau XAMPP, lalu pastikan `php` di terminal mengarah ke
+versi yang benar.
 
 ### 2. Jalankan MySQL XAMPP
 
-Buka XAMPP Manager, lalu start service MySQL.
-
-Database bisa dibuat lewat phpMyAdmin:
-
-```text
-http://localhost/phpmyadmin
-```
-
-Atau lewat terminal:
+Buka XAMPP Manager → start MySQL. Buat database via phpMyAdmin
+(`http://localhost/phpmyadmin`) atau terminal:
 
 ```bash
 /Applications/XAMPP/xamppfiles/bin/mysql -u root
 ```
 
-Lalu jalankan SQL berikut:
-
 ```sql
 CREATE DATABASE rujukan_pasien CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;
 ```
 
-Untuk development lokal XAMPP, biasanya user MySQL adalah `root` dengan password
-kosong. Jika ingin lebih rapi, buat user khusus:
+Opsional — buat user khusus:
 
 ```sql
 CREATE USER 'rujukan_user'@'localhost' IDENTIFIED BY 'passwordku';
@@ -121,20 +123,12 @@ GRANT ALL PRIVILEGES ON rujukan_pasien.* TO 'rujukan_user'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
-### 3. Clone atau masuk ke folder project
-
-Jika belum clone:
+### 3. Clone & masuk folder
 
 ```bash
 cd /Users/chandrair/Documents/GitHub
 git clone https://github.com/kumbang-kobum/rujukan-pasien.git
 cd rujukan-pasien
-```
-
-Jika folder sudah ada:
-
-```bash
-cd /Users/chandrair/Documents/GitHub/rujukan-pasien
 ```
 
 ### 4. Install dependency
@@ -144,18 +138,16 @@ composer install
 npm install
 ```
 
-Jangan memakai `vendor` dan `node_modules` hasil copy dari Windows. Biarkan
-Composer dan NPM memasang ulang dependency sesuai environment macOS.
+Jangan menyalin `vendor/` atau `node_modules/` dari Windows — install ulang
+agar sesuai dengan environment macOS.
 
-### 5. Buat dan isi `.env`
-
-Jika `.env` belum ada:
+### 5. Konfigurasi `.env`
 
 ```bash
 cp .env.example .env
 ```
 
-Ubah bagian utama `.env` menjadi seperti ini:
+Sesuaikan bagian berikut:
 
 ```env
 APP_NAME="Rujukan Pasien"
@@ -175,15 +167,12 @@ QUEUE_CONNECTION=database
 CACHE_STORE=database
 ```
 
-Catatan penting untuk XAMPP macOS:
+> Gunakan `DB_HOST=127.0.0.1` (bukan `localhost`) agar Laravel memakai koneksi
+> TCP, bukan socket MySQL bawaan macOS.
 
-- Pakai `DB_HOST=127.0.0.1`, bukan `localhost`, supaya Laravel memakai koneksi
-  TCP dan tidak mencari socket MySQL bawaan macOS.
-- Jika MySQL XAMPP memakai port lain, sesuaikan `DB_PORT`.
-- Jika memakai user khusus, isi `DB_USERNAME=rujukan_user` dan
-  `DB_PASSWORD=passwordku`.
+**Email (opsional di lokal)** — lihat bagian [Konfigurasi Email Brevo](#konfigurasi-email-brevo).
 
-### 6. Generate key, migrasi database, dan storage link
+### 6. Generate key, migrasi, storage
 
 ```bash
 php artisan key:generate
@@ -192,166 +181,113 @@ php artisan storage:link --force
 php artisan optimize:clear
 ```
 
-Jika database sudah berisi data lama dari Windows, backup dulu sebelum migrasi.
-Untuk database kosong, perintah di atas aman dijalankan langsung.
-
-### 7. Jalankan aplikasi
-
-Terminal pertama:
+### 7. Jalankan
 
 ```bash
+# Terminal 1
 php artisan serve --host=127.0.0.1 --port=8000
-```
 
-Terminal kedua:
-
-```bash
+# Terminal 2
 npm run dev
 ```
 
-Buka:
-
-```text
-http://127.0.0.1:8000
-```
-
-Alternatif, project ini juga punya script Composer untuk menjalankan server,
-queue, log, dan Vite sekaligus:
+Atau jalankan semuanya sekaligus:
 
 ```bash
 composer run dev
 ```
 
-Gunakan mode ini setelah database dan migrasi sudah siap.
+Buka `http://127.0.0.1:8000`.
 
-## Cara Development Harian di macOS
+---
 
-Masuk folder project:
+## Konfigurasi Email Brevo
 
-```bash
-cd /Users/chandrair/Documents/GitHub/rujukan-pasien
+Aplikasi ini mengirim notifikasi email rujukan melalui **Brevo Transactional API**,
+bukan SMTP Laravel standar. Tambahkan tiga variabel berikut ke `.env`:
+
+```env
+BREVO_API_KEY=xkeysib-xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+BREVO_SENDER_EMAIL=noreply@domain-anda.com
+BREVO_SENDER_NAME="Rujukan Pasien"
 ```
 
-Ambil update terbaru dari GitHub:
+Cara mendapatkan API key:
 
-```bash
-git pull origin main
-```
+1. Daftar / login di [brevo.com](https://www.brevo.com).
+2. Buka **Settings → SMTP & API → API Keys**.
+3. Buat API key baru dengan permission *Transactional emails*.
+4. `BREVO_SENDER_EMAIL` harus berupa alamat yang sudah diverifikasi di Brevo
+   (*Senders & IPs → Senders*).
 
-Jika ada perubahan dependency:
-
-```bash
-composer install
-npm install
-```
-
-Jika ada migration baru:
-
-```bash
-php artisan migrate
-```
-
-Jalankan ulang cache saat config atau route berubah:
+Setelah mengisi `.env`, jalankan:
 
 ```bash
 php artisan optimize:clear
 ```
 
-Jalankan aplikasi:
+Jika `QUEUE_CONNECTION=database`, email masuk antrian dan baru terkirim saat
+queue worker berjalan:
 
 ```bash
-php artisan serve --host=127.0.0.1 --port=8000
-npm run dev
+php artisan queue:work --once   # proses satu job
+php artisan queue:failed        # cek job gagal
 ```
 
-Sebelum push perubahan:
+Untuk testing lokal tanpa queue worker, ubah sementara ke:
 
-```bash
-php artisan test
-npm run build
-git status
+```env
+QUEUE_CONNECTION=sync
 ```
+
+---
 
 ## Install di Server aaPanel
 
-Panduan ini mengasumsikan server memakai aaPanel dengan Nginx atau Apache,
-PHP 8.2/8.3, dan MySQL/MariaDB.
-
-### 1. Install software di aaPanel
+### 1. Software aaPanel
 
 Dari App Store aaPanel, install:
 
 - Nginx atau Apache
-- PHP 8.2 atau PHP 8.3
+- PHP 8.2 / 8.3
 - MySQL atau MariaDB
-- phpMyAdmin, opsional
-- Redis, opsional
-- Supervisor Manager, opsional untuk queue worker
+- Supervisor Manager (untuk queue worker)
 
-Aktifkan extension PHP yang umum dipakai Laravel:
-
-- `fileinfo`
-- `pdo_mysql`
-- `mysqli`
-- `mbstring`
-- `openssl`
-- `tokenizer`
-- `xml`
-- `ctype`
-- `json`
-- `bcmath`
-- `curl`
-- `zip`
-- `gd`
-- `intl`
-
-Pastikan Composer tersedia di server. Jika command `php` aaPanel berbeda
-versi, pakai path PHP aaPanel, contoh:
-
-```bash
-/www/server/php/82/bin/php -v
-```
+Aktifkan extension PHP: `fileinfo`, `pdo_mysql`, `mysqli`, `mbstring`,
+`openssl`, `tokenizer`, `xml`, `ctype`, `json`, `bcmath`, `curl`, `zip`,
+`gd`, `intl`.
 
 ### 2. Buat database
 
-Di menu Database aaPanel, buat database:
+Menu Database aaPanel:
 
-```text
+```
 Database : rujukan_pasien
 User     : rujukan_user
 Password : isi_password_kuat
 ```
 
-### 3. Clone project dari GitHub
-
-Masuk terminal server:
+### 3. Clone & install
 
 ```bash
 cd /www/wwwroot
 git clone https://github.com/kumbang-kobum/rujukan-pasien.git
 cd rujukan-pasien
-```
 
-Install dependency production:
-
-```bash
 composer install --no-dev --optimize-autoloader
 npm ci
 npm run build
 ```
 
-Jika server tidak memakai Node.js, jalankan `npm run build` di lokal, lalu
-pastikan hasil build `public/build` ikut tersedia di server lewat proses deploy
-yang dipakai.
+Jika server tidak ada Node.js, jalankan `npm run build` di lokal dan
+pastikan folder `public/build/` ikut tersedia di server.
 
-### 4. Setup `.env` production
+### 4. `.env` production
 
 ```bash
 cp .env.example .env
 php artisan key:generate
 ```
-
-Isi `.env` production:
 
 ```env
 APP_NAME="Rujukan Pasien"
@@ -370,32 +306,14 @@ SESSION_DRIVER=database
 QUEUE_CONNECTION=database
 CACHE_STORE=database
 
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=alamat_gmail_anda@gmail.com
-MAIL_PASSWORD=app_password_gmail
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=alamat_gmail_anda@gmail.com
-MAIL_FROM_NAME="${APP_NAME}"
+BREVO_API_KEY=xkeysib-xxxxxxxxxxxxxxxx
+BREVO_SENDER_EMAIL=noreply@domain-anda.com
+BREVO_SENDER_NAME="Rujukan Pasien"
 ```
 
-Jangan commit file `.env` ke GitHub.
+Jangan commit `.env` ke Git.
 
-Untuk Gmail, gunakan **App Password**, bukan password login Gmail biasa.
-Aktifkan 2-Step Verification di akun Google, buat App Password untuk aplikasi
-mail, lalu masukkan nilainya ke `MAIL_PASSWORD`. Sebaiknya
-`MAIL_FROM_ADDRESS` sama dengan `MAIL_USERNAME`, kecuali memakai SMTP provider
-yang memang mengizinkan alamat pengirim berbeda.
-
-Jika mengganti konfigurasi `.env` di server, jalankan:
-
-```bash
-php artisan optimize:clear
-php artisan config:cache
-```
-
-### 5. Migrasi, storage, permission, dan cache
+### 5. Migrasi, storage, permission
 
 ```bash
 php artisan migrate --seed --force
@@ -405,37 +323,33 @@ php artisan config:cache
 php artisan view:cache
 ```
 
-Catatan: jangan jalankan `php artisan route:cache` dulu selama `routes/web.php`
-masih memakai closure route untuk redirect.
-
-Set permission untuk user web aaPanel:
+> Jangan jalankan `php artisan route:cache` selama `routes/web.php` masih
+> menggunakan closure route.
 
 ```bash
 chown -R www:www storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
 ```
 
-Jika command `php` mengarah ke versi yang salah, gunakan PHP aaPanel:
+Jika `php` tidak mengarah ke versi aaPanel yang benar:
 
 ```bash
 /www/server/php/82/bin/php artisan migrate --seed --force
 ```
 
-### 6. Setting website aaPanel
+### 6. Konfigurasi website aaPanel
 
-Di menu Website aaPanel:
+1. Tambahkan domain di menu Website.
+2. Document root:
 
-1. Tambahkan domain.
-2. Arahkan document root ke:
-
-```text
+```
 /www/wwwroot/rujukan-pasien/public
 ```
 
-3. Pilih PHP 8.2 atau 8.3.
-4. Aktifkan SSL jika domain sudah mengarah ke server.
+3. Pilih PHP 8.2 / 8.3.
+4. Aktifkan SSL.
 
-Untuk Nginx, tambahkan rewrite Laravel:
+Untuk Nginx, tambahkan rewrite:
 
 ```nginx
 location / {
@@ -443,206 +357,177 @@ location / {
 }
 ```
 
-Untuk Apache, file `public/.htaccess` Laravel biasanya sudah cukup. Pastikan
-rewrite Apache aktif.
+Untuk Apache, file `public/.htaccess` Laravel sudah cukup — pastikan
+`mod_rewrite` aktif.
 
-### 7. Queue worker, jika dipakai
+### 7. Queue worker (wajib untuk email)
 
-Project memakai `QUEUE_CONNECTION=database`. Notifikasi rujukan via email
-dikirim melalui queue, jadi email akan masuk ke tabel `jobs` dulu dan baru
-terkirim jika queue worker berjalan.
+Email rujukan dikirim via queue. Tanpa queue worker berjalan, email tidak
+akan terkirim meski konfigurasi Brevo sudah benar.
 
-Contoh command Supervisor:
+Contoh konfigurasi Supervisor aaPanel:
 
 ```bash
 cd /www/wwwroot/rujukan-pasien && php artisan queue:work --tries=3 --timeout=90
 ```
 
-Jika memakai PHP aaPanel:
+---
 
-```bash
-cd /www/wwwroot/rujukan-pasien && /www/server/php/82/bin/php artisan queue:work --tries=3 --timeout=90
-```
-
-Untuk tes manual tanpa Supervisor:
-
-```bash
-php artisan queue:work --once
-php artisan queue:failed
-```
-
-Jika ingin email dikirim langsung tanpa worker pada instalasi kecil, ubah:
-
-```env
-QUEUE_CONNECTION=sync
-```
-
-Untuk production, rekomendasinya tetap `QUEUE_CONNECTION=database` ditambah
-queue worker yang aktif lewat Supervisor atau service manager aaPanel.
-
-## Update Server aaPanel dari Repo GitHub
-
-Langkah update aman:
+## Update Server dari GitHub
 
 ```bash
 cd /www/wwwroot/rujukan-pasien
-```
 
-Backup database dulu:
+# Backup database
+mysqldump -u rujukan_user -p rujukan_pasien > backup-$(date +%F-%H%M).sql
 
-```bash
-mysqldump -u rujukan_user -p rujukan_pasien > backup-rujukan-pasien-$(date +%F-%H%M).sql
-```
-
-Aktifkan maintenance mode:
-
-```bash
+# Maintenance mode
 php artisan down
-```
 
-Cek perubahan lokal di server:
-
-```bash
-git status
-```
-
-Ambil update terbaru:
-
-```bash
+# Ambil update
 git pull origin main
-```
 
-Update dependency dan asset:
-
-```bash
+# Update dependency & asset
 composer install --no-dev --optimize-autoloader
-npm ci
-npm run build
-```
+npm ci && npm run build
 
-Jalankan migrasi dan refresh cache:
-
-```bash
+# Migrasi & refresh cache
 php artisan migrate --force
-php artisan berkas:migrate-private
 php artisan optimize:clear
 php artisan config:cache
 php artisan view:cache
-```
 
-Jika command `berkas:migrate-private` menampilkan file lama yang akan
-dipindahkan dan backup sudah aman, jalankan:
-
-```bash
-php artisan berkas:migrate-private --execute
-```
-
-Catatan: jangan jalankan `php artisan route:cache` dulu selama `routes/web.php`
-masih memakai closure route untuk redirect.
-
-Pastikan permission tetap benar:
-
-```bash
+# Permission
 chown -R www:www storage bootstrap/cache
 chmod -R 775 storage bootstrap/cache
-```
 
-Matikan maintenance mode:
-
-```bash
+# Matikan maintenance
 php artisan up
 ```
 
-Jika `git pull` gagal karena ada perubahan lokal di server, pilih salah satu:
+Jika `git pull` gagal karena ada perubahan lokal:
 
 ```bash
-git stash push -u -m "backup perubahan lokal sebelum update"
+git stash push -u -m "backup sebelum update"
 git pull origin main
 ```
 
-Atau, jika server harus mengikuti GitHub persis dan semua perubahan lokal boleh
-dibuang:
+Atau reset paksa ke GitHub (perubahan lokal hilang):
 
 ```bash
-git fetch origin
-git reset --hard origin/main
+git fetch origin && git reset --hard origin/main
 ```
 
-Gunakan `git reset --hard` hanya setelah yakin tidak ada perubahan lokal penting
-di server.
+---
 
 ## Import Database Lama
 
-Jika membawa database dari Windows atau backup server:
-
 ```bash
 mysql -u root -p rujukan_pasien < backup.sql
+php artisan migrate
+php artisan optimize:clear
 ```
 
-Untuk XAMPP macOS:
+XAMPP macOS:
 
 ```bash
 /Applications/XAMPP/xamppfiles/bin/mysql -u root rujukan_pasien < backup.sql
 ```
 
-Setelah import:
+---
 
-```bash
-php artisan migrate
-php artisan optimize:clear
-```
+## Migrasi Berkas Medis ke Private Storage
 
-## Migrasi Berkas Medis Lama ke Private Storage
+Upload baru disimpan di `storage/app/private/berkas` dan diakses via route
+yang wajib login. File lama di `storage/app/public/berkas` perlu dipindahkan.
 
-Mulai tahap pengamanan berkas medis, upload baru disimpan di
-`storage/app/private/berkas` dan hanya dibuka lewat route yang wajib login.
-Jika sebelumnya ada file lama di `storage/app/public/berkas`, pindahkan ke
-private storage dengan command berikut.
-
-Cek dulu tanpa memindahkan file:
+Simulasi (tanpa memindahkan):
 
 ```bash
 php artisan berkas:migrate-private
 ```
 
-Jika hasil simulasi sudah sesuai, jalankan migrasi:
+Jalankan migrasi setelah yakin backup aman:
 
 ```bash
 php artisan berkas:migrate-private --execute
 ```
 
-Command ini tidak mengubah nilai `path` di database. File dengan path yang sama
-dipindahkan dari disk public ke disk private, lalu salinan public dihapus. Jika
-file private sudah ada dan masih ada duplikat di public, duplikat public ikut
-dihapus saat memakai `--execute`.
+---
+
+## Cara Development Harian
+
+```bash
+cd /Users/chandrair/Documents/GitHub/rujukan-pasien
+
+git pull origin main
+composer install   # jika ada perubahan dependency
+npm install        # jika ada perubahan package
+
+php artisan migrate          # jika ada migration baru
+php artisan optimize:clear   # setelah ubah config/route
+
+php artisan serve --host=127.0.0.1 --port=8000
+npm run dev
+```
+
+Sebelum push:
+
+```bash
+php artisan test
+npm run build
+git status
+```
+
+---
+
+## Catatan Git
+
+File yang tidak perlu masuk Git (sudah ada di `.gitignore`):
+
+```
+.env
+vendor/
+node_modules/
+public/build/
+public/storage
+storage/logs/*.log
+.DS_Store
+```
+
+---
 
 ## Troubleshooting
 
+### Error 500 di halaman Edit Kunjungan
+
+Pastikan sudah menjalankan `php artisan optimize:clear` setelah update.
+Jika masih terjadi, cek log:
+
+```bash
+tail -n 100 storage/logs/laravel.log
+```
+
 ### `could not find driver`
 
-PHP CLI belum punya extension `pdo_mysql`.
-
-Cek:
+PHP CLI belum memiliki extension `pdo_mysql`.
 
 ```bash
 php -m | grep pdo_mysql
 ```
 
-Aktifkan extension MySQL pada PHP yang dipakai terminal. Di aaPanel, aktifkan
-`pdo_mysql` dari menu PHP extension.
+Aktifkan extension dari menu PHP aaPanel atau konfigurasi `php.ini`.
 
 ### `SQLSTATE[HY000] [2002] Connection refused`
 
-MySQL belum berjalan, host/port salah, atau Laravel mencoba socket yang salah.
-
-Untuk XAMPP macOS, gunakan:
+MySQL belum berjalan atau konfigurasi salah. Untuk XAMPP macOS:
 
 ```env
 DB_HOST=127.0.0.1
 DB_PORT=3306
 ```
 
-Lalu clear cache:
+Lalu:
 
 ```bash
 php artisan optimize:clear
@@ -650,119 +535,47 @@ php artisan optimize:clear
 
 ### `Vite manifest not found`
 
-Asset production belum dibuild.
-
 ```bash
-npm install
-npm run build
+npm install && npm run build
 ```
 
-### Halaman 500 setelah update
+### Email rujukan tidak terkirim
 
-Cek log:
+1. Pastikan `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`, dan `BREVO_SENDER_NAME`
+   sudah diisi di `.env`.
+2. Pastikan `BREVO_SENDER_EMAIL` sudah diverifikasi di dashboard Brevo.
+3. Pastikan queue worker berjalan (`php artisan queue:work`).
+4. Cek antrian gagal: `php artisan queue:failed`.
+5. Cek log: `tail -n 100 storage/logs/laravel.log`.
 
-```bash
-tail -n 100 storage/logs/laravel.log
-```
-
-Clear dan rebuild cache:
-
-```bash
-php artisan optimize:clear
-php artisan config:cache
-php artisan view:cache
-```
-
-### Email rujukan tidak masuk
-
-Cek dulu email dokter tujuan pada menu pengguna. Dokter yang menjadi tujuan
-rujukan harus punya alamat email yang valid.
-
-Pastikan konfigurasi SMTP di `.env` sudah benar:
-
-```env
-MAIL_MAILER=smtp
-MAIL_HOST=smtp.gmail.com
-MAIL_PORT=587
-MAIL_USERNAME=alamat_gmail_anda@gmail.com
-MAIL_PASSWORD=app_password_gmail
-MAIL_ENCRYPTION=tls
-MAIL_FROM_ADDRESS=alamat_gmail_anda@gmail.com
-MAIL_FROM_NAME="${APP_NAME}"
-```
-
-Jika memakai Gmail, `MAIL_PASSWORD` harus App Password. Setelah mengubah `.env`,
-clear dan cache ulang konfigurasi:
-
-```bash
-php artisan optimize:clear
-php artisan config:cache
-```
-
-Jika `QUEUE_CONNECTION=database`, email tidak akan terkirim sampai queue worker
-berjalan. Tes manual:
-
-```bash
-php artisan queue:work --once
-php artisan queue:failed
-```
-
-Cek error detail di log:
-
-```bash
-tail -n 100 storage/logs/laravel.log
-```
-
-Jika ingin memastikan email terkirim langsung tanpa worker, gunakan sementara:
+Untuk testing tanpa queue:
 
 ```env
 QUEUE_CONNECTION=sync
 ```
 
-Setelah itu jalankan lagi `php artisan optimize:clear`.
+### Pasien tidak muncul di dropdown SOAP (RS tujuan)
 
-### Upload atau storage tidak tampil
+Pastikan rujukan sudah berstatus **Diterima** (tombol Terima ada di halaman
+detail rujukan). Pasien dari RS asal hanya muncul setelah rujukan diterima.
 
-Pastikan storage link dan permission:
+### Upload atau berkas medis tidak tampil
 
 ```bash
 php artisan storage:link --force
 chmod -R 775 storage bootstrap/cache
 ```
 
-Di aaPanel:
+aaPanel:
 
 ```bash
 chown -R www:www storage bootstrap/cache
 ```
 
-Jika muncul `The [public/storage] link already exists`, cek dulu apakah
-`public/storage` adalah folder hasil copy dari Windows, bukan symlink:
+Jika `public/storage` adalah folder (bukan symlink) dari Windows:
 
 ```bash
 ls -la public/storage
-```
-
-Jika isinya sudah ada juga di `storage/app/public`, backup folder lama lalu buat
-ulang symlink:
-
-```bash
 mv public/storage public/storage.backup
 php artisan storage:link
 ```
-
-## Catatan Git
-
-File dan folder berikut tidak perlu masuk Git:
-
-- `.env`
-- `vendor`
-- `node_modules`
-- `public/build`
-- `public/storage`
-- `storage/logs/*.log`
-- `.DS_Store`
-
-Jika pindah dari Windows ke macOS, lebih baik clone repo bersih dari GitHub lalu
-jalankan `composer install` dan `npm install`, bukan menyalin seluruh folder
-hasil development Windows.
