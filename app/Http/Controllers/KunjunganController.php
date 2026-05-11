@@ -197,23 +197,23 @@ class KunjunganController extends Controller
         return redirect()->route('kunjungan.index')->with('success','Kunjungan diperbarui.');
     }
 
-    public function destroy(Kunjungan $kunjungan)
+    public function destroy(Request $request, Kunjungan $kunjungan)
     {
         $this->authorizeView($kunjungan);
         abort_unless(auth()->check() && auth()->user()->isAdmin(), 403);
         $kunjungan->delete();
-        return redirect()->route('kunjungan.index')->with('success','Kunjungan dihapus.');
+        return redirect()->route('kunjungan.index', $request->query())->with('success','Kunjungan dihapus.');
     }
 
     /**
      * Tandai pasien pulang
      */
-    public function pulangkan(Kunjungan $kunjungan)
+    public function pulangkan(Request $request, Kunjungan $kunjungan)
     {
         $this->authorizeView($kunjungan);
 
         if ($kunjungan->status_pulang) {
-            return back()->with('info','Pasien sudah dipulangkan.');
+            return redirect()->route('kunjungan.index', $request->query())->with('info','Pasien sudah dipulangkan.');
         }
 
         $kunjungan->update([
@@ -221,7 +221,7 @@ class KunjunganController extends Controller
             'waktu_pulang'  => now(),
         ]);
 
-        return redirect()->route('kunjungan.index')->with('success','Pasien berhasil dipulangkan.');
+        return redirect()->route('kunjungan.index', $request->query())->with('success','Pasien berhasil dipulangkan.');
     }
 
     /**

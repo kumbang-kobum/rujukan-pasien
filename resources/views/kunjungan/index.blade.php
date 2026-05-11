@@ -106,7 +106,7 @@
 
                             {{-- Hanya admin yang boleh menghapus --}}
                             @if(auth()->check() && auth()->user()->isAdmin())
-                                <form action="{{ route('kunjungan.destroy', $k->id) }}" method="POST" class="d-inline"
+                                <form action="{{ route('kunjungan.destroy', array_merge(['kunjungan' => $k->id], request()->query())) }}" method="POST" class="d-inline"
                                       onsubmit="return confirm('Hapus kunjungan ini? Tindakan tidak bisa dibatalkan.')">
                                     @csrf @method('DELETE')
                                     <button class="btn btn-danger btn-sm">Hapus</button>
@@ -114,7 +114,7 @@
                             @endif
 
                             @if($k->status_pulang == 0)
-                                <form action="{{ route('kunjungan.pulangkan', $k->id) }}" method="POST" class="d-inline">
+                                <form action="{{ route('kunjungan.pulangkan', array_merge(['kunjungan' => $k->id], request()->query())) }}" method="POST" class="d-inline">
                                     @csrf @method('PATCH')
                                     <button class="btn btn-success btn-sm">Pulangkan</button>
                                 </form>
