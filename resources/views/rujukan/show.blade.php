@@ -84,6 +84,10 @@
             <button class="btn btn-outline-danger">Tolak Rujukan</button>
           </form>
         @elseif($rujukan->status === 'diterima')
+          <a href="{{ route('soap.create', ['kunjungan_id' => $rujukan->kunjungan_id]) }}"
+             class="btn btn-primary btn-sm">
+            Tambah SOAP RS Tujuan
+          </a>
           <form action="{{ route('rujukan.ubahStatus', ['rujukan' => $rujukan->id, 'status' => 'menunggu']) }}"
                 method="POST" class="d-inline"
                 onsubmit="return confirm('Kembalikan status ke Menunggu?')">
@@ -108,7 +112,13 @@
       <div class="border rounded p-3 mb-3">
         <div class="d-flex justify-content-between mb-2">
           <strong>SOAP #{{ $soap->id }}</strong>
-          <small class="text-muted">{{ $soap->created_at->format('d/m/Y H:i') }} &mdash; {{ $soap->user?->name ?? '-' }}</small>
+          <small class="text-muted">
+            {{ $soap->created_at->format('d/m/Y H:i') }} &mdash;
+            {{ $soap->user?->name ?? '-' }}
+            @if($soap->user?->rumahSakit)
+              ({{ $soap->user->rumahSakit->nama }})
+            @endif
+          </small>
         </div>
 
         @if($soap->td_sys || $soap->td_dia || $soap->map)

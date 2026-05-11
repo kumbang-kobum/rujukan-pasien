@@ -111,9 +111,11 @@ class SOAPController extends Controller
         return $pdf->stream('SOAP-'.$soap->id.'.pdf');
     }
 
-    public function create()
+    public function create(Request $request)
     {
         $user = Auth::user();
+        $selectedKunjunganId = $request->integer('kunjungan_id') ?: null;
+
         $kunjungan = $this->visibleKunjunganQuery()
             ->with('pasien')
             ->where(function ($q) use ($user) {
@@ -128,7 +130,11 @@ class SOAPController extends Controller
             ->orderByDesc('tanggal_kunjungan')
             ->get();
 
-        return view('soap.create', compact('kunjungan'));
+        if ($selectedKunjunganId && ! $kunjungan->contains('id', $selectedKunjunganId)) {
+            abort(403);
+        }
+
+        return view('soap.create', compact('kunjungan', 'selectedKunjunganId'));
     }
 
     public function store(Request $request)

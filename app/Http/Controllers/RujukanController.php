@@ -342,7 +342,16 @@ class RujukanController extends Controller
     public function show(Rujukan $rujukan)
     {
         $this->assertViewable($rujukan);
-        $rujukan->load(['kunjungan.pasien', 'kunjungan.soap.user', 'rsAsal', 'rsTujuan', 'dokterTujuan', 'penerima']);
+        $rujukan->load([
+            'kunjungan.pasien',
+            'kunjungan.soap' => function ($query) {
+                $query->with('user.rumahSakit')->oldest();
+            },
+            'rsAsal',
+            'rsTujuan',
+            'dokterTujuan',
+            'penerima',
+        ]);
 
         return view('rujukan.show', compact('rujukan'));
     }

@@ -59,6 +59,9 @@
                     <i class="fas fa-comment-medical"></i> Konsultasi
                 </a>
             @endif
+            <a href="{{ route('soap.create', ['kunjungan_id' => $kunjungan->id]) }}" class="btn btn-primary btn-sm">
+                <i class="fas fa-notes-medical"></i> Tambah SOAP
+            </a>
             <form action="{{ route('kunjungan.destroy',$kunjungan->id) }}" method="POST" class="d-inline"
                   onsubmit="return confirm('Hapus kunjungan ini?')">
                 @csrf @method('DELETE')

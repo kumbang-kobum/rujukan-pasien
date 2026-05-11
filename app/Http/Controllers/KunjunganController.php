@@ -143,7 +143,7 @@ class KunjunganController extends Controller
     {
         $this->authorizeView($kunjungan);
 
-        $kunjungan->load(['pasien','dokter','user','soap']);
+        $kunjungan->load(['pasien','dokter','user','soap.user','berkasMedis.uploader']);
         return view('kunjungan.show', compact('kunjungan'));
     }
 
