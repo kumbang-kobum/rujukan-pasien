@@ -8,10 +8,8 @@ use App\Models\RumahSakit;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Notification;
 use App\Notifications\RujukanMasukNotification;
-use Throwable;
 
 class RujukanController extends Controller
 {
@@ -39,27 +37,6 @@ class RujukanController extends Controller
             || (int)$user->rumah_sakit_id === (int)$rujukan->rumah_sakit_tujuan_id,
             403
         );
-    }
-
-    private function sendRujukanNotification($recipients, Rujukan $rujukan): bool
-    {
-        if ($recipients->isEmpty()) {
-            return true;
-        }
-
-        try {
-            Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
-
-            return true;
-        } catch (Throwable $e) {
-            Log::warning('Gagal mengirim notifikasi email rujukan.', [
-                'rujukan_id' => $rujukan->id,
-                'recipient_ids' => $recipients->pluck('id')->all(),
-                'error' => $e->getMessage(),
-            ]);
-
-            return false;
-        }
     }
 
     public function index(Request $request)
@@ -221,31 +198,25 @@ class RujukanController extends Controller
         // kirim email ke dokter utama + semua CC
         $recipientIds = $ccIds->push((int)$request->dokter_tujuan_id)->unique()->values();
         $recipients   = User::whereIn('id', $recipientIds)->whereNotNull('email')->get();
-        $emailSent = true;
         if ($recipients->isNotEmpty()) {
-            $emailSent = $this->sendRujukanNotification($recipients, $rujukan);
+            Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
         }
     
-        $message = $emailSent
-            ? 'Rujukan berhasil ditambahkan & email notifikasi sedang diproses.'
-            : 'Rujukan berhasil ditambahkan, tetapi email notifikasi belum terkirim. Periksa konfigurasi email/queue.';
-
         return redirect()->route('rujukan.index')
-            ->with($emailSent ? 'success' : 'warning', $message);
+            ->with('success','Rujukan berhasil ditambahkan & email dikirim ke dokter tujuan/tembusan.');
     }
 
     public function edit(Rujukan $rujukan)
     {
         $this->assertViewable($rujukan);
         $this->assertManage($rujukan);
-
-        $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
     
         $kunjungan = Kunjungan::query()
             ->where('rumah_sakit_id', $rsAsalId)
             ->with('pasien')
             ->orderByDesc('tanggal_kunjungan')
             ->get();
+        $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
     
         $rumahSakitTujuan = RumahSakit::where('id','!=',$rsAsalId)->orderBy('nama')->get();
     
@@ -328,7 +299,6 @@ class RujukanController extends Controller
             $recipientIds->push((int)$rujukan->dokter_tujuan_id);
         }
         $recipientIds = $recipientIds->merge($ccIds)->unique()->values();
-        $emailSent = true;
     
         if ($recipientIds->isNotEmpty()) {
             $recipients = User::whereIn('id', $recipientIds)
@@ -336,15 +306,11 @@ class RujukanController extends Controller
                 ->get();
     
             if ($recipients->isNotEmpty()) {
-                $emailSent = $this->sendRujukanNotification($recipients, $rujukan);
+                Notification::send($recipients, new RujukanMasukNotification($rujukan, auth()->user()));
             }
         }
     
-        $message = $emailSent
-            ? 'Rujukan berhasil diperbarui.'
-            : 'Rujukan berhasil diperbarui, tetapi email notifikasi belum terkirim. Periksa konfigurasi email/queue.';
-
-        return redirect()->route('rujukan.index')->with($emailSent ? 'success' : 'warning', $message);
+        return redirect()->route('rujukan.index')->with('success','Rujukan berhasil diperbarui.');
     }
 
     public function destroy(Rujukan $rujukan)
