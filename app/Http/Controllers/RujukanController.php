@@ -211,12 +211,13 @@ class RujukanController extends Controller
         $this->assertViewable($rujukan);
         $this->assertManage($rujukan);
     
+        $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
+
         $kunjungan = Kunjungan::query()
             ->where('rumah_sakit_id', $rsAsalId)
             ->with('pasien')
             ->orderByDesc('tanggal_kunjungan')
             ->get();
-        $rsAsalId  = (int) $rujukan->rumah_sakit_asal_id;
     
         $rumahSakitTujuan = RumahSakit::where('id','!=',$rsAsalId)->orderBy('nama')->get();
     
@@ -341,7 +342,7 @@ class RujukanController extends Controller
     public function show(Rujukan $rujukan)
     {
         $this->assertViewable($rujukan);
-        $rujukan->load(['kunjungan.pasien', 'rsAsal', 'rsTujuan', 'dokterTujuan', 'penerima']);
+        $rujukan->load(['kunjungan.pasien', 'kunjungan.soap.user', 'rsAsal', 'rsTujuan', 'dokterTujuan', 'penerima']);
 
         return view('rujukan.show', compact('rujukan'));
     }
