@@ -14,21 +14,41 @@ class DashboardController extends Controller
     {
         $user = $request->user();
         $tahun = (int) now()->format('Y');
+        $today = now()->toDateString();
+
+        $visibleKunjunganQuery = Kunjungan::query()->visibleTo($user);
+        $visibleRujukanQuery = Rujukan::query()->visibleTo($user);
 
         $pasienCount = $user->isSuperAdmin()
             ? Pasien::count()
-            : Kunjungan::query()
-                ->visibleTo($user)
+            : (clone $visibleKunjunganQuery)
                 ->distinct('pasien_id')
                 ->count('pasien_id');
 
+        $kunjunganCount = (clone $visibleKunjunganQuery)->count();
+        $kunjunganHariIniCount = (clone $visibleKunjunganQuery)
+            ->whereDate('tanggal_kunjungan', $today)
+            ->count();
+
         $rujukanKirimCount = $user->isSuperAdmin()
-            ? Rujukan::count()
+            ? (clone $visibleRujukanQuery)->count()
             : Rujukan::where('rumah_sakit_asal_id', $user->rumah_sakit_id)->count();
 
         $rujukanTerimaCount = $user->isSuperAdmin()
             ? RumahSakit::count()
             : Rujukan::where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)->count();
+
+        $statusCounts = [
+            'menunggu' => (clone $visibleRujukanQuery)->where('status', 'menunggu')->count(),
+            'diterima' => (clone $visibleRujukanQuery)->where('status', 'diterima')->count(),
+            'ditolak' => (clone $visibleRujukanQuery)->where('status', 'ditolak')->count(),
+        ];
+
+        $latestRujukan = (clone $visibleRujukanQuery)
+            ->with(['kunjungan.pasien', 'rsAsal', 'rsTujuan', 'dokterTujuan'])
+            ->latest()
+            ->take(6)
+            ->get();
 
         $pasienPerBulan = $this->monthlyPatientSeries($user, $tahun);
         $rujukanPerBulan = $this->monthlyReferralSeries($user, $tahun);
@@ -39,10 +59,15 @@ class DashboardController extends Controller
                 ? 'Platform semua rumah sakit'
                 : ($user->rumahSakit->nama ?? 'Rumah sakit saya'),
             'pasienCount' => $pasienCount,
+            'kunjunganLabel' => $user->isSuperAdmin() ? 'Total Kunjungan' : 'Kunjungan Terlihat',
+            'kunjunganCount' => $kunjunganCount,
+            'kunjunganHariIniCount' => $kunjunganHariIniCount,
             'rujukanKirimLabel' => $user->isSuperAdmin() ? 'Total Rujukan' : 'Rujukan Dikirim',
             'rujukanKirimCount' => $rujukanKirimCount,
             'rujukanTerimaLabel' => $user->isSuperAdmin() ? 'Total Rumah Sakit' : 'Rujukan Diterima',
             'rujukanTerimaCount' => $rujukanTerimaCount,
+            'statusCounts' => $statusCounts,
+            'latestRujukan' => $latestRujukan,
             'seriesPasien' => $pasienPerBulan,
             'seriesRujukan' => $rujukanPerBulan,
         ]);
