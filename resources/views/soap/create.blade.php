@@ -33,7 +33,7 @@
 
       <div class="mb-3">
         <label>Pasien (No Rawat - No RM - Nama)</label>
-        <select name="kunjungan_id" class="form-select" required>
+        <select name="kunjungan_id" class="form-select select2" required>
           <option value="">-- Pilih Pasien --</option>
           @foreach($kunjungan as $k)
             <option value="{{ $k->id }}" @selected((int) old('kunjungan_id', $selectedKunjunganId ?? 0) === (int) $k->id)>

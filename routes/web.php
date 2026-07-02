@@ -16,7 +16,9 @@ use App\Http\Controllers\ProfileController;
 
 
 Route::get('/', function () {
-    return redirect('/login');
+    return auth()->check()
+        ? redirect()->route('dashboard')
+        : redirect()->route('login');
 });
 
 Route::middleware(['auth'])->group(function () {
@@ -71,11 +73,6 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/konsultasi/{konsultasi}/reply', [KonsultasiController::class, 'reply'])->name('konsultasi.reply');
         Route::patch('/konsultasi/{konsultasi}/close', [KonsultasiController::class, 'close'])->name('konsultasi.close');
         Route::post('/konsultasi/{konsultasi}/escalate', [KonsultasiController::class, 'escalate'])->name('konsultasi.escalate');
-    });
-
-    // Default redirect setelah login
-    Route::get('/', function () { 
-        return redirect()->route('dashboard');
     });
 });
 
