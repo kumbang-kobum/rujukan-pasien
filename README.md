@@ -31,6 +31,93 @@ https://github.com/kumbang-kobum/rujukan-pasien.git
 | `dokter` | Buat/lihat rujukan, buat SOAP, konsultasi |
 | `petugas` | Buat SOAP, upload berkas medis |
 
+## Cara Pakai Aplikasi
+
+### A. Panduan untuk Admin / Petugas RS
+
+#### 1. Mendaftarkan Pasien Baru
+1. Login ke aplikasi.
+2. Buka menu **Pelayanan RS → Pasien**.
+3. Klik **Tambah Pasien**.
+4. Isi form: NIK, Nama, Tempat/Tanggal Lahir, Jenis Kelamin, Alamat, Telepon.
+5. Nomor RM otomatis ter-generate (format: 6 digit, berurut).
+6. Klik **Simpan**.
+
+#### 2. Membuat Kunjungan Pasien
+1. Buka menu **Pelayanan RS → Kunjungan**.
+2. Klik **Tambah**.
+3. Pilih **Pasien** (bisa dicari via dropdown Select2), **Dokter**, jenis rawat (Rawat Jalan/Inap), tanggal & waktu.
+4. Isi keluhan utama (opsional).
+5. Klik **Simpan**. No. Rawat otomatis ter-generate (format: `YYYY/MM/DD/00001`).
+
+#### 3. Membuat Catatan SOAP
+1. Buka menu **Pelayanan RS → SOAP**.
+2. Klik **Tambah SOAP**.
+3. Pilih pasien dari dropdown (bisa dicari dengan ketik no rawat / no RM / nama).
+4. Isi atau gunakan **Template SOAP** (dropdown di atas form).
+5. Lengkapi: Subjektif, Objektif (termasuk Tanda Vital), Assessment, Plan, Advice.
+6. Opsional: tambahkan lampiran (USG/LAB/LAIN).
+7. Klik **Simpan**.
+
+> **Tips:** Gunakan tombol *Isi Otomatis* untuk mengisi form dari template. Centang *Tambahkan* jika ingin menambah ke teks yang sudah ada, bukan menimpa.
+
+#### 4. Menandai Pasien Pulang
+1. Buka menu **Kunjungan**.
+2. Cari pasien yang masih berstatus **Rawat** (badge kuning).
+3. Klik tombol **Pulangkan** (hijau).
+4. Status berubah menjadi **Pulang** (badge hijau) dan waktu pulang tercatat.
+
+#### 5. Upload Berkas Medis
+1. Dari halaman **Kunjungan → Lihat**, scroll ke bagian Berkas Medis.
+2. Atau dari **SOAP → Edit**, scroll ke bagian lampiran.
+3. Pilih kategori (USG / LAB / LAIN), upload file (JPG/PNG/PDF, maks 5 MB).
+
+---
+
+### B. Panduan Rujukan Antar RS
+
+#### 1. Membuat Rujukan (RS Asal)
+1. Pastikan pasien sudah punya **Kunjungan** aktif di RS Anda.
+2. Buka menu **Pelayanan RS → Rujukan**.
+3. Klik **Tambah Rujukan**.
+4. Pilih kunjungan pasien, RS tujuan, dokter tujuan.
+5. Isi alasan rujukan dan catatan.
+6. Opsional: pilih dokter CC (tembusan).
+7. Klik **Simpan**. Status awal: **Menunggu**.
+8. Email notifikasi otomatis dikirim ke dokter tujuan & CC.
+
+#### 2. Menerima / Menolak Rujukan (RS Tujuan)
+1. Buka menu **Rujukan**. Rujukan yang masuk ke RS Anda akan tampil.
+2. Klik **Lihat** untuk membuka detail rujukan.
+3. Klik **Terima Rujukan** atau **Tolak Rujukan**.
+4. Setelah diterima, pasien dari RS asal akan muncul di dropdown **SOAP → Tambah SOAP**.
+
+#### 3. Melihat SOAP dari RS Asal
+- Di halaman **detail rujukan**, SOAP dari RS asal ditampilkan di bagian bawah sebagai referensi klinis.
+
+---
+
+### C. Konsultasi Dokter
+
+#### 1. Mengirim Konsultasi
+1. Hanya **dokter** yang bisa mengirim konsultasi.
+2. Buka menu **Konsultasi Dokter → Buat Konsultasi**.
+3. Pilih kunjungan pasien, RS tujuan, dokter tujuan.
+4. Isi judul, ringkasan klinis, diagnosis, alasan konsultasi.
+5. Lengkapi consent pasien (status, nama pemberi, hubungan, metode, tanggal).
+6. Klik **Simpan Konsultasi** (terkirim) atau simpan sebagai **Draft**.
+
+#### 2. Menjawab Konsultasi
+1. Dokter tujuan akan menerima notifikasi email.
+2. Buka konsultasi di menu **Konsultasi Dokter**.
+3. Klik **Terima** konsultasi, lalu balas dengan **Jawaban** atau **Minta Info Tambahan**.
+
+#### 3. Menjadikan Rujukan dari Konsultasi
+1. Setelah ada jawaban klinis, dokter pengirim bisa klik **Jadikan Rujukan**.
+2. Sistem otomatis membuat record rujukan dari data konsultasi.
+
+---
+
 ## Alur Penggunaan Rujukan
 
 1. **RS Asal (RS S)** — buat kunjungan pasien → buat catatan SOAP → buat rujukan ke RS B.
@@ -375,47 +462,141 @@ cd /www/wwwroot/rujukan-pasien && php artisan queue:work --tries=3 --timeout=90
 
 ## Update Server dari GitHub
 
+### Prosedur Update Aman
+
+#### 1. Persiapan (Pre-Update Checklist)
+
+Sebelum update, pastikan:
+
+- [ ] Tidak ada user yang sedang aktif menggunakan aplikasi
+- [ ] Backup database terbaru sudah dibuat
+- [ ] Akses SSH ke server tersedia
+- [ ] Anda tahu versi/tag saat ini (`git log --oneline -1`)
+
+#### 2. Jalankan Update
+
 ```bash
 cd /www/wwwroot/rujukan-pasien
 
-# Backup database
+# === BACKUP ===
+# Backup database (WAJIB)
 mysqldump -u rujukan_user -p rujukan_pasien > backup-$(date +%F-%H%M).sql
 
-# Maintenance mode
-php artisan down
+# Backup file .env (jaga-jaga)
+cp .env .env.backup-$(date +%F-%H%M)
 
-# Ambil update
+# === MAINTENANCE MODE ===
+php artisan down --retry=60
+
+# === AMBIL UPDATE ===
+# Cek branch/tag yang akan di-pull
+git fetch origin
+git log --oneline HEAD..origin/main   # lihat commit baru
+
+# Pull update
 git pull origin main
 
-# Update dependency & asset
+# === UPDATE DEPENDENCY ===
+composer install --no-dev --optimize-autoloader
+
+# Jika ada perubahan asset (JS/CSS):
+npm ci && npm run build
+
+# === MIGRASI DATABASE ===
+# Backup dulu sebelum migrate!
+php artisan migrate --force
+
+# === REFRESH CACHE ===
+php artisan optimize:clear
+php artisan config:cache
+php artisan view:cache
+php artisan route:cache  # hanya jika route TIDAK menggunakan closure
+
+# === PERMISSION ===
+chown -R www:www storage bootstrap/cache
+chmod -R 775 storage bootstrap/cache
+
+# === SELESAI ===
+php artisan up
+```
+
+#### 3. Verifikasi Pasca-Update
+
+Setelah `php artisan up`, cek:
+
+1. Buka halaman utama aplikasi — pastikan tidak error.
+2. Login dengan akun admin — pastikan bisa login.
+3. Cek beberapa halaman penting (Kunjungan, SOAP, Rujukan).
+4. Cek log untuk error: `tail -n 50 storage/logs/laravel.log`
+
+#### 4. Rollback (Jika Update Gagal)
+
+Jika terjadi error setelah update, lakukan rollback:
+
+```bash
+cd /www/wwwroot/rujukan-pasien
+
+# Maintenance mode
+php artisan down --retry=60
+
+# Rollback code ke versi sebelumnya
+git log --oneline -5  # cari commit sebelum update
+git reset --hard <commit-sebelum-update>
+
+# Rollback dependency
 composer install --no-dev --optimize-autoloader
 npm ci && npm run build
 
-# Migrasi & refresh cache
-php artisan migrate --force
+# Rollback migration (HAPUS data migration terakhir!)
+# HANYA lakukan jika migration baru menyebabkan masalah
+php artisan migrate:rollback --force
+
+# Restore cache
 php artisan optimize:clear
 php artisan config:cache
 php artisan view:cache
 
-# Permission
-chown -R www:www storage bootstrap/cache
-chmod -R 775 storage bootstrap/cache
+# Jika database corrupt, restore dari backup:
+# mysql -u rujukan_user -p rujukan_pasien < backup-YYYY-MM-DD-HHMM.sql
 
-# Matikan maintenance
 php artisan up
 ```
 
-Jika `git pull` gagal karena ada perubahan lokal:
+#### 5. Jika `git pull` Gagal karena Perubahan Lokal
 
+**Opsi A — Stash (aman, perubahan lokal tersimpan):**
 ```bash
-git stash push -u -m "backup sebelum update"
+git stash push -u -m "backup lokal sebelum update $(date +%F)"
 git pull origin main
+# Jika perlu restore: git stash pop
 ```
 
-Atau reset paksa ke GitHub (perubahan lokal hilang):
+**Opsi B — Reset paksa (PERHATIAN: perubahan lokal HILANG):**
+```bash
+# BACKUP dulu perubahan lokal!
+git diff > /tmp/local-changes.patch   # simpan diff
+git fetch origin
+git reset --hard origin/main
+# Jika perlu restore: git apply /tmp/local-changes.patch
+```
+
+> **Jangan pernah** langsung `git reset --hard` tanpa backup perubahan lokal.
+
+### Tips Tagging Release
+
+Untuk memudahkan rollback, buat tag setiap kali deploy:
 
 ```bash
-git fetch origin && git reset --hard origin/main
+# Setelah pull dan verifikasi sukses
+git tag -a v1.0.1 -m "Deploy: fix bug SOAP dropdown, 2 Juli 2026"
+git push origin v1.0.1
+```
+
+Untuk rollback ke tag tertentu:
+```bash
+git checkout v1.0.1 -- .
+# atau
+git reset --hard v1.0.1
 ```
 
 ---
@@ -460,30 +641,75 @@ php artisan berkas:migrate-private --execute
 ```bash
 cd /Users/chandrair/Documents/GitHub/rujukan-pasien
 
+# Sinkron dengan GitHub
 git pull origin main
-composer install   # jika ada perubahan dependency
-npm install        # jika ada perubahan package
 
-php artisan migrate          # jika ada migration baru
-php artisan optimize:clear   # setelah ubah config/route
+# Install dependency (jika ada perubahan)
+composer install
+npm install
 
+# Jalankan migration baru (jika ada)
+php artisan migrate
+
+# Clear cache setelah ubah config/route
+php artisan optimize:clear
+
+# Jalankan aplikasi
 php artisan serve --host=127.0.0.1 --port=8000
 npm run dev
 ```
 
-Sebelum push:
+### Workflow Git yang Disarankan
 
 ```bash
-php artisan test
+# 1. Selalu pull sebelum mulai kerja
+git pull origin main
+
+# 2. Buat branch untuk fitur/fix
+#    (opsional tapi direkomendasikan)
+git checkout -b fitur/nama-fitur
+# atau
+git checkout -b fix/nama-bug
+
+# 3. Setelah selesai, commit dan push
+git add .
+git commit -m "fix: deskripsi perubahan"
+git push origin nama-branch
+
+# 4. Merge ke main (jika di branch terpisah)
+git checkout main
+git merge nama-branch
+
+# 5. Sebelum push, cek:
+php artisan test      # jalankan test
+npm run build         # build asset
+git status            # cek file yang berubah
+```
+
+### Sebelum Deploy ke Production
+
+```bash
+# Pastikan build asset terbaru
 npm run build
-git status
+
+# Test di lokal
+php artisan test
+
+# Commit semua perubahan
+git add .
+git commit -m "deploy: deskripsi update"
+git push origin main
+
+# Buat tag untuk rollback
+git tag -a v1.x.x -m "Deploy: deskripsi"
+git push origin v1.x.x
 ```
 
 ---
 
 ## Catatan Git
 
-File yang tidak perlu masuk Git (sudah ada di `.gitignore`):
+### File yang tidak perlu masuk Git (sudah ada di `.gitignore`)
 
 ```
 .env
@@ -494,6 +720,41 @@ public/storage
 storage/logs/*.log
 .DS_Store
 ```
+
+### Branching Strategy
+
+| Branch | Fungsi |
+|---|---|
+| `main` | Kode production, selalu stabil |
+| `fitur/*` | Pengembangan fitur baru |
+| `fix/*` | Perbaikan bug |
+
+### Konvensi Commit Message
+
+```
+feat: tambah fitur konsultasi dokter
+fix: perbaiki dropdown SOAP tidak tampil pasien
+refactor: pisahkan scope visibleTo ke trait
+docs: update README cara pakai
+deploy: update v1.0.1 ke server
+```
+
+### Tagging Release
+
+Setiap deploy ke production, buat tag agar mudah rollback:
+
+```bash
+git tag -a v1.0.1 -m "Deploy: fix SOAP dropdown, 2 Juli 2026"
+git push origin v1.0.1
+```
+
+### Perintah yang Harus Dihindari
+
+| Perintah | Bahaya |
+|---|---|
+| `git push --force` ke `main` | Menimpa history, rekan tim kehilangan kerja |
+| `git reset --hard` tanpa backup | Perubahan lokal hilang permanen |
+| `git checkout .` tanpa commit | Semua perubahan belum-commit hilang |
 
 ---
 
@@ -558,6 +819,21 @@ QUEUE_CONNECTION=sync
 
 Pastikan rujukan sudah berstatus **Diterima** (tombol Terima ada di halaman
 detail rujukan). Pasien dari RS asal hanya muncul setelah rujukan diterima.
+
+Jika pasien sudah terdaftar di kunjungan tapi tetap tidak muncul di dropdown
+SOAP, kemungkinan kolom `status_pulang` bernilai NULL (data lama sebelum
+migration). Jalankan SQL berikut untuk memperbaiki:
+
+```sql
+UPDATE kunjungan SET status_pulang = 0 WHERE status_pulang IS NULL;
+```
+
+Atau via artisan:
+
+```bash
+php artisan tinker
+>>> DB::statement('UPDATE kunjungan SET status_pulang = 0 WHERE status_pulang IS NULL');
+```
 
 ### Upload atau berkas medis tidak tampil
 

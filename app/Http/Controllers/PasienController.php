@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Pasien;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PasienController extends Controller
 {
@@ -53,11 +54,9 @@ class PasienController extends Controller
 
     public function create()
     {
-        // Ambil no RM terakhir
+        // Preview no RM berikutnya (final number ditentukan saat store dengan lock)
         $last = Pasien::orderBy('id', 'desc')->first();
         $nextNo = $last ? intval($last->no_rkm_medis) + 1 : 1;
-
-        // Format jadi 6 digit: 000001, 000002, dst
         $no_rkm_medis = str_pad($nextNo, 6, '0', STR_PAD_LEFT);
 
         return view('pasien.create', compact('no_rkm_medis'));
@@ -75,11 +74,18 @@ class PasienController extends Controller
             'telepon'       => 'nullable|string|max:20',
         ]);
 
+        // Generate no_rkm_medis dengan lock untuk mencegah duplikasi
+        $no_rkm_medis = DB::transaction(function () {
+            $last = Pasien::lockForUpdate()->orderBy('id', 'desc')->first();
+            $nextNo = $last ? intval($last->no_rkm_medis) + 1 : 1;
+            return str_pad($nextNo, 6, '0', STR_PAD_LEFT);
+        });
+
         Pasien::create([
-            'no_rkm_medis'  => $request->no_rkm_medis,
+            'no_rkm_medis'  => $no_rkm_medis,
             'nik'           => $request->nik,
             'nama'          => $request->nama,
-            'tempat_lahir'  => $request->tempat_lahir, // <<< WAJIB ADA
+            'tempat_lahir'  => $request->tempat_lahir,
             'tanggal_lahir' => $request->tanggal_lahir,
             'jenis_kelamin' => $request->jenis_kelamin,
             'alamat'        => $request->alamat,
@@ -112,7 +118,7 @@ class PasienController extends Controller
             'telepon'      => 'nullable|string|max:20',
         ]);
 
-        $pasien->update($request->all());
+        $pasien->update($request->validated());
         return redirect()->route('pasien.index')->with('success', '✅ Pasien berhasil diperbarui.');
     }
 

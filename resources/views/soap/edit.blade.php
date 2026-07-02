@@ -17,7 +17,7 @@
       <div class="mb-3">
         <label class="form-label">Pasien</label>
         <input type="hidden" name="kunjungan_id" value="{{ $soap->kunjungan_id }}">
-        <select name="kunjungan_id" class="form-control" disabled>
+        <select class="form-control" disabled aria-hidden="true">
           @foreach($kunjungan as $k)
             <option value="{{ $k->id }}" {{ $soap->kunjungan_id == $k->id ? 'selected' : '' }}>
               @if(isset($myRsId) && (int)$k->rumah_sakit_id !== $myRsId)

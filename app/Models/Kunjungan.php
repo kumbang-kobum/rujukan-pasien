@@ -91,6 +91,6 @@ class Kunjungan extends Model
     public function berkasMedis()
     {
         return $this->hasMany(BerkasMedis::class, 'kunjungan_id')
-                    ->orderByDesc('created_at');;
+                    ->orderByDesc('created_at');
     }
 }

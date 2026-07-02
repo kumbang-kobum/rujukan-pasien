@@ -35,7 +35,7 @@ class DashboardController extends Controller
             : Rujukan::where('rumah_sakit_asal_id', $user->rumah_sakit_id)->count();
 
         $rujukanTerimaCount = $user->isSuperAdmin()
-            ? RumahSakit::count()
+            ? Rujukan::where('status', 'diterima')->count()
             : Rujukan::where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)->count();
 
         $statusCounts = [

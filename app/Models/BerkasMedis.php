@@ -13,7 +13,7 @@ class BerkasMedis extends Model
     protected $table = 'berkas_medis';
 
     protected $fillable = [
-        'kunjungan_id','soap_id','kategori','nama_file','path','mime','uploader_id'
+        'kunjungan_id','soap_id','kategori','nama_file','path','uploader_id'
     ];
 
     public function scopeVisibleTo(Builder $query, User $user): Builder

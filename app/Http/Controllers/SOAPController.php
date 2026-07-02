@@ -119,13 +119,16 @@ class SOAPController extends Controller
         $kunjungan = $this->visibleKunjunganQuery()
             ->with(['pasien', 'rumahSakit'])
             ->where(function ($q) use ($user) {
-                // kunjungan sendiri: hanya yang masih aktif
-                $q->where('status_pulang', 0)
-                  // kunjungan rujukan diterima: tampilkan meski sudah berstatus pulang di RS asal
-                  ->orWhereHas('rujukan', function ($r) use ($user) {
-                      $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
-                        ->where('status', 'diterima');
-                  });
+                // kunjungan sendiri: yang masih aktif atau status_pulang belum di-set (NULL)
+                $q->where(function ($sub) {
+                    $sub->where('status_pulang', 0)
+                        ->orWhereNull('status_pulang');
+                })
+                // kunjungan rujukan diterima: tampilkan meski sudah berstatus pulang di RS asal
+                ->orWhereHas('rujukan', function ($r) use ($user) {
+                    $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
+                      ->where('status', 'diterima');
+                });
             })
             ->orderByDesc('tanggal_kunjungan')
             ->get();
@@ -252,7 +255,10 @@ class SOAPController extends Controller
         $kunjungan = $this->visibleKunjunganQuery()
             ->with(['pasien', 'rumahSakit'])
             ->where(function ($q) use ($user) {
-                $q->where('status_pulang', 0)
+                $q->where(function ($sub) {
+                    $sub->where('status_pulang', 0)
+                        ->orWhereNull('status_pulang');
+                })
                   ->orWhereHas('rujukan', function ($r) use ($user) {
                       $r->where('rumah_sakit_tujuan_id', $user->rumah_sakit_id)
                         ->where('status', 'diterima');
